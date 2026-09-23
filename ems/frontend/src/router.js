@@ -1,9 +1,9 @@
-/* Hash router (FR-213). Routes: #/, #/verlauf, #/vzev, #/vzev/mitglied/:id?,
-   #/vzev/abrechnung, #/einstellungen/:tab? — unknown routes render Übersicht.
+/* Hash router (FR-213). Routes: #/, #/verlauf, #/zaehler, #/modbus,
+   #/einstellungen/:tab? — unknown routes render Übersicht.
    #/demo is a hidden route rendering every shared component. */
 import { useState, useEffect } from './core.js';
 
-  /* pattern: '/vzev/mitglied/:id?' — ':name' = required, ':name?' = optional */
+  /* pattern: '/einstellungen/:tab?' — ':name' = required, ':name?' = optional */
   function match(pattern, path) {
     var pp = pattern.split('/').filter(function (s) { return s !== ''; });
     var pa = path.split('/').filter(function (s) { return s !== ''; });

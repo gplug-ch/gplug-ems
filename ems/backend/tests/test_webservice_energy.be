@@ -137,18 +137,16 @@ for bad : ['1d', '1mo', 'bogus']
           f"res={bad} error body wrong: '{webserver.body()}'")
 end
 
-# the record shape carries no vZEV fields any more (the browser derives them)
+# the served record carries exactly the raw fields
 webserver.reset()
 webserver.set_args({'res': '15m', 'count': '4'})
 webservice.energy_request()
 recs = json.load(webserver.body())
 check(size(recs) == 4, f"expected 4 records, got {size(recs)}")
-check(!recs[0].contains('vzev_in_wh') && !recs[0].contains('vzev_out_wh'),
-      "served record must not carry the vZEV fields")
 check(recs[0].contains('ts') && recs[0].contains('imp_wh') &&
       recs[0].contains('exp_wh') && recs[0].contains('pv_wh'),
       "served record lost a raw field")
-print("Test 4b passed: res=1d/1mo -> 400, records carry no vZEV fields")
+print("Test 4b passed: res=1d/1mo -> 400, records carry the raw fields")
 
 # --- GET /api/power over several flush boundaries ---------------------------
 # meter.ingest() appends one sample per call; enough of them force multiple

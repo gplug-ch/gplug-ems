@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-07-29T00:00:00Z",
-  "title": "Design System: vZEV Energy Management UI",
+  "title": "Design System: gPlug EMS UI",
   "extensions": {
     "colorMeta": {
       "cream-bg":    { "role": "neutral", "displayName": "Cream BG",     "canonical": "#F3EFE2", "tonalRamp": ["#26241C", "#3C392B", "#57533F", "#756F55", "#9A9276", "#C0B99C", "#DED8C1", "#F3EFE2"] },
@@ -13,11 +13,11 @@
       "line":        { "role": "neutral", "displayName": "Line",         "canonical": "#E3DED0", "tonalRamp": ["#4B4739", "#67624F", "#847E67", "#A49E84", "#C2BCA4", "#E3DED0", "#EFEBDE", "#F7F4EC"] },
       "production":  { "role": "tertiary","displayName": "Production (Gelb)",   "canonical": "#D99A06", "tonalRamp": ["#442F02", "#654703", "#875F05", "#A97706", "#CB8F08", "#D99A06", "#F0BB3E", "#F8D888"] },
       "consumption": { "role": "secondary","displayName": "Consumption (Blau)", "canonical": "#2D9CDB", "tonalRamp": ["#0A2C3E", "#0F4460", "#155E83", "#1B79A8", "#2394CE", "#2D9CDB", "#68BAE6", "#A6D7F1"] },
-      "vzev":        { "role": "tertiary","displayName": "vZEV (Grün)",         "canonical": "#3E7C28", "tonalRamp": ["#12240B", "#1D3A15", "#29521E", "#356A27", "#3E7C28", "#4E9A33", "#77BC5D", "#A9D89A"] },
+      "export":      { "role": "tertiary","displayName": "Export (Grün)",       "canonical": "#3E7C28", "tonalRamp": ["#12240B", "#1D3A15", "#29521E", "#356A27", "#3E7C28", "#4E9A33", "#77BC5D", "#A9D89A"] },
       "import":      { "role": "tertiary","displayName": "Import (Rot)",        "canonical": "#C62D20", "tonalRamp": ["#3E0E09", "#5C140D", "#7C1B12", "#9C2217", "#BC291D", "#C62D20", "#E0665C", "#EFA6A0"] },
       "battery":     { "role": "tertiary","displayName": "Battery (Türkis)",    "canonical": "#0F766E", "tonalRamp": ["#04241F", "#063A32", "#095147", "#0C685C", "#0F766E", "#149286", "#3FBDAF", "#8AD8CF"] },
       "import-fill": { "role": "tertiary","displayName": "Import Fill",         "canonical": "#F5C1BC", "tonalRamp": ["#5C2721", "#7E362E", "#A0463B", "#C15D51", "#DA8479", "#EBA9A0", "#F5C1BC", "#FBE0DD"] },
-      "vzev-fill":   { "role": "tertiary","displayName": "vZEV Fill",           "canonical": "#C4E3C9", "tonalRamp": ["#28402B", "#39583D", "#4E7152", "#688B6C", "#89A88C", "#A9C4AC", "#C4E3C9", "#E3F2E5"] },
+      "export-fill": { "role": "tertiary","displayName": "Export Fill",         "canonical": "#C4E3C9", "tonalRamp": ["#28402B", "#39583D", "#4E7152", "#688B6C", "#89A88C", "#A9C4AC", "#C4E3C9", "#E3F2E5"] },
       "active":      { "role": "tertiary","displayName": "Active",             "canonical": "#2FA452", "tonalRamp": ["#0C2E17", "#124623", "#185E30", "#1F763D", "#268E4A", "#2FA452", "#5FC17D", "#9BDBAF"] },
       "inactive":    { "role": "neutral", "displayName": "Inactive",           "canonical": "#6B6B77", "tonalRamp": ["#2B2B31", "#3E3E45", "#54545C", "#6B6B77", "#8B8B95", "#ACACB4", "#CECED3", "#EEEEF0"] }
     },
@@ -120,7 +120,7 @@
       { "name": "The One-Hero-Number Rule", "body": "Display size (40px) is spent on at most one number per view. If a second value competes at that size, demote it to KPI (26px) or Title.", "section": "typography" },
       { "name": "The Fixed-Rail Rule", "body": "Navigation is a persistent navy rail on desktop and a navy drawer on mobile — never a light-on-light nav. The rail is the one large field of navy; content is paper.", "section": "layout" },
       { "name": "The Single-Shadow Rule", "body": "The system has exactly one shadow token. Don't introduce a second elevation tier; hierarchy comes from the colour-coded left edge, hairlines, and paper contrast.", "section": "elevation" },
-      { "name": "The Colour-Edge Rule", "body": "A card's identity is its 4px left border: Netz = Navy, Erzeuger = Production gold, Lasten = Consumption blue, vZEV = vZEV green. Warning/hint surfaces use an amber left edge on a pale-amber (#FCF3DC) wash.", "section": "elevation" }
+      { "name": "The Colour-Edge Rule", "body": "A card's identity is its 4px left border: Netz = Navy, Erzeuger = Production gold, Lasten = Consumption blue. Warning/hint surfaces use an amber left edge on a pale-amber (#FCF3DC) wash.", "section": "elevation" }
     ],
     "dos": [
       "Do keep the page ground Cream BG (#F3EFE2) and reserve white for data-bearing surfaces.",

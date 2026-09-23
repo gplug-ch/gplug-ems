@@ -92,13 +92,12 @@ test('netz kWh: Netzbezug is drawn below the 0-axis', () => {
   assert.strictEqual(p.label, 'history.chart.legend_import');
 });
 
-test('netz kWh: vZEV export / feed-in is drawn above the 0-axis', () => {
+test('netz kWh: feed-in is drawn above the 0-axis', () => {
   var r = rec(T0, 3000, 2000, 0);
-  r.vzev_out_wh = 2000;
-  var c = buildChart([r], 'net', false, true /* producer */);
+  var c = buildChart([r], 'net', false);
   var p = c.points[0];
   assert.strictEqual(p.y, 2, 'export is positive');
-  assert.strictEqual(p.color, 'var(--c-vzev)');
+  assert.strictEqual(p.color, 'var(--c-export)');
   assert.strictEqual(p.label, 'history.chart.legend_export');
 });
 
@@ -109,7 +108,7 @@ test('netz kWh: tooltip shows magnitudes (sign is a direction)', () => {
 
 test('netz CHF: the saldo keeps its own sign (a negative saldo is a cost)', () => {
   var r = rec(T0, 0, 0, 1200);
-  r.cost_vzev_chf = 0.5; r.revenue_vzev_chf = 0;
+  r.cost_import_chf = 0.5; r.revenue_feedin_chf = 0;
   var c = buildChart([r], 'net', true, false);
   assert.strictEqual(c.points[0].y, -0.5, 'cost below the axis');
   assert.strictEqual(c.signedMagnitude, false, 'CHF stays signed in the tooltip');

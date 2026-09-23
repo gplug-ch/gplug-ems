@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-**vZEV** is an Energy Management System (EMS) for a virtual energy community. It distributes available renewable energy (photovoltaic) across multiple physical sites, activating/deactivating loads (dryer, heat pump, wallbox, boiler) using a greedy priority-based allocation algorithm.
+**gPlug EMS** is an Energy Management System (EMS) for a single site, running on a Tasmota gPlug device. It distributes the site's PV surplus to its controllable loads (dryer, heat pump, wallbox, boiler) using a greedy priority-based allocation algorithm, and records raw 15-min energy data that the browser UI turns into history and costs.
 
 ## Repository structure
 
@@ -39,7 +39,7 @@ Each subdirectory has its own `CLAUDE.md` with component-specific commands and a
 
 ### Two runtimes, one domain model
 
-**EMS (production):** Berry scripts packaged as a `.tapp` deployed on Tasmota ESP32 firmware. The device ships only a tiny `index.html` shell; the Vite-built JS/CSS bundle and the `lang.json` dictionary are served from a CDN (GitHub Pages, gplug-ch/gplug-cdn), versioned by `VERSION.txt`. A self-host mode (`make ASSET_BASE=self`) packs the assets back into the `.tapp` for offline/restricted networks. The EMS is the master node; it runs the allocation algorithm and communicates with slave SITE nodes via UDP multicast (`239.3.0.1:5007`).
+**EMS (production):** Berry scripts packaged as a `.tapp` deployed on Tasmota ESP32 firmware. The device ships only a tiny `index.html` shell; the Vite-built JS/CSS bundle and the `lang.json` dictionary are served from a CDN (GitHub Pages, gplug-ch/gplug-cdn), versioned by `VERSION.txt`. A self-host mode (`make ASSET_BASE=self`) packs the assets back into the `.tapp` for offline/restricted networks. Each device is standalone: it runs the allocation algorithm for its own site only; there is no inter-device communication.
 
 **Simulator:** Spring Boot backend + React frontend running on a PC/server. Mirrors the EMS domain model for testing and demonstration without physical devices.
 
@@ -63,13 +63,11 @@ ESP32-C3 heap and boot-loops (see `ems/backend/autoexec.be`).
 autoexec.be → main.be
                 ├── logger.be
                 ├── webservice.be ──→ store.be (raw 15-min records)
-                ├── messaging/udpdriver.be (multicast transport)
                 ├── site.be (loads + productions + outbound-HTTP scheduler)
-                │      └── integrations/ (homeassistant, shelly, gplug, simulator)
+                │      └── integrations/ (homeassistant, shelly, gplug, modbustcp, simulator)
                 ├── ems.be (allocation algorithm, every_second driver)
                 ├── meter.be (10 s sampling → 15-min Wh slots)
-                ├── configservice.be (GET/POST /api/config, lazily loaded)
-                └── vzev.be (community registry + UDP slot exchange, lazily loaded)
+                └── configservice.be (GET/POST /api/config, lazily loaded)
 ```
 
 ### Integrations
@@ -90,17 +88,17 @@ All endpoints are HTTP GET. State transitions and power setpoints are sent as qu
 
 Key endpoints: `GET /loads`, `GET /loads?id=<id>&action=transition&to=<state>`, `GET /productions`, `GET /site`, `GET /api/meta` (`{time, tariffs}`), `GET /api/meter` (raw smart-meter passthrough, spec 007), `GET /api/modbus` (standalone Modbus registers — site.json `"modbusRegisters"`, array of config + live `currentPower`, streamed like `/loads`/`/productions`; not a foreign-descriptor passthrough like `/api/meter` since the device already owns the labels). Spec 011 step 1 deleted the dead surface: `/grid`, `/reload`, `action=set-power`, the bare `?id=` item reads and `meta.version`/`meta.language`. Spec 011 step 2 deleted the device-side config validator: `POST /api/config` now only rejects a body that is not a JSON object (400) or a document `site.load_config()` cannot load (500 + rollback) — every field rule lives in the browser (`frontend/src/pages/einstellungen.js`).
 
-**Device serves raw data; the browser computes analytics.** To keep the tiny ESP32-C3 Berry heap free, the device does no cost or roll-up math: `GET /api/energy` streams raw Wh records (a battery site adds `bat_chg_wh`/`bat_dis_wh` — charge/discharge behind the meter, never part of vZEV; the SoC is live only) and the browser derives CHF (`frontend/src/lib/aggregate.js`). Likewise the vZEV community exposes only `GET /api/vzev/raw` (producer id + community tariffs + raw per-member slot rings — the tariffs are producer-authoritative, distributed to consumers via the UDP announcements so every site prices billing identically); the browser runs allocation, flow bucketing and quarterly billing (`frontend/src/lib/vzev.js`). Since spec 011 step 3b the device does not allocate at all — `announce_slot()` just stores its own slot and multicasts it. (The former `/api/vzev/flows` and `/api/vzev/billing` endpoints were removed.) The smart-meter detail page (spec 007) follows the same rule: `GET /api/meter` returns the raw Tasmota SMI sensor object (`z`) verbatim and the browser labels/groups/derives everything (`frontend/src/lib/metercat.js`, `frontend/src/pages/zaehler.js`).
+**Device serves raw data; the browser computes analytics.** To keep the tiny ESP32-C3 Berry heap free, the device does no cost or roll-up math: `GET /api/energy` streams raw Wh records (a battery site adds `bat_chg_wh`/`bat_dis_wh` — charge/discharge behind the meter; the SoC is live only) and the browser derives CHF (`frontend/src/lib/aggregate.js`). The smart-meter detail page (spec 007) follows the same rule: `GET /api/meter` returns the raw Tasmota SMI sensor object (`z`) verbatim and the browser labels/groups/derives everything (`frontend/src/lib/metercat.js`, `frontend/src/pages/zaehler.js`).
 
 **…and the browser stores.** Since spec 011 step 3a the browser also keeps the
-history: `ems/frontend/src/lib/archive.js` mirrors every raw 15-min record and
-raw vZEV peer slot into IndexedDB, syncs incrementally on each visit
-(`/api/energy?res=15m&from=…` pages forward), and derives day/month roll-ups,
-the own vZEV share, costs and quarterly billing locally. The device shrank to a
-short raw buffer — `KEEP_DAYS = 30` own slots, `VZ_KEEP_DAYS = 14` peer slots —
+history: `ems/frontend/src/lib/archive.js` mirrors every raw 15-min record into
+IndexedDB, syncs incrementally on each visit
+(`/api/energy?res=15m&from=…` pages forward), and derives day/month roll-ups
+and costs locally. The device shrank to a
+short raw buffer — `KEEP_DAYS = 30` days of slots —
 and the Einstellungen «Daten» tab shows coverage, gaps and CSV export/import.
 Step 3b (issue #8, v1.0.13) then deleted the redundant device side: the day/month
-roll-ups (`/e1d`, `/e1mo`), `store.set_vzev` and the vZEV allocation are gone,
+roll-ups (`/e1d`, `/e1mo`) are gone,
 `GET /api/energy` serves `res=15m` only, and **the device never rewrites a file** —
 every data write is an append.
 
@@ -108,9 +106,8 @@ every data write is an append.
 
 ### Configuration
 
-- `site.json` (on the device) — the ONLY device config: site metadata, loads array, productions, grid, tariffs, optional `meter` block, optional `modbusRegisters` array (standalone Modbus registers, see `modbustcp` above and `GET /api/modbus`) and `messaging.udp` (multicast overrides; defaults `239.3.0.1:5007`). Served and written by `GET/POST /api/config`. There is no `ems.json` and no `udpclient.json`.
-- `/vzev.json` (on the device) — vZEV member registry, maintained by `vzev.be`
-- `ems/backend/examples/` — example `site.json` files (simulator, gPlug, Home Assistant, Shelly, UDP producer/consumer, Modbus TCP)
+- `site.json` (on the device) — the ONLY device config: site metadata, loads array, productions, grid, tariffs, optional `meter` block, optional `modbusRegisters` array (standalone Modbus registers, see `modbustcp` above and `GET /api/modbus`). Served and written by `GET/POST /api/config`. There is no `ems.json`.
+- `ems/backend/examples/` — example `site.json` files (simulator, gPlug, Home Assistant, Shelly, Modbus TCP)
 - `simulator/backend/src/main/resources/application.yaml` — Spring Boot config (port 9090, simulator site definitions)
 
 ### Build output

@@ -20,8 +20,8 @@ const SRC = path.join(ROOT, 'src');
    real key ends alphanumeric/underscore; a trailing dot is a dynamic prefix. */
 const PREFIXES = [
   'nav', 'state', 'common', 'error', 'banner', 'table', 'page', 'placeholder',
-  'tooltip', 'panel', 'hint', 'billing', 'history', 'settings', 'vzev', 'demo',
-  'stat', 'action', 'kpi', 'flow', 'explain', 'tariff', 'comp', 'modbus'
+  'tooltip', 'panel', 'hint', 'history', 'settings', 'demo',
+  'stat', 'action', 'kpi', 'flow', 'tariff', 'comp', 'modbus'
 ];
 const KEY_RE = new RegExp(
   "['\"]((?:" + PREFIXES.join('|') + ")\\.[a-z0-9_.]*[a-z0-9_])['\"]", 'g'
@@ -72,10 +72,10 @@ test('i18n: the spec-010 keys are present in both languages', () => {
   const en = loadLang('en');
   const required = [
     'flow.status_export', 'flow.status_import', 'flow.status_covered',
-    'flow.status_idle', 'flow.status_unknown', 'flow.vzev_mean_note',
+    'flow.status_idle', 'flow.status_unknown',
     'flow.prod_nodata', 'flow.comp_now', 'flow.comp_today', 'flow.comp_cover',
     'flow.comp_usage', 'flow.comp_nodata', 'flow.comp_zero', 'flow.comp_batt_note',
-    'comp.pv', 'comp.load', 'comp.battery', 'comp.charge', 'comp.vzev',
+    'comp.pv', 'comp.load', 'comp.battery', 'comp.charge',
     'comp.grid', 'comp.feedin', 'settings.prodtype.unknown_warn'
   ];
   required.forEach(function (k) {

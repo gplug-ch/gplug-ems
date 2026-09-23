@@ -33,8 +33,7 @@
 #
 # Battery (issue #20): bat_w is integrated split by sign into charge and
 # discharge Wh, sealed with the slot (the SoC is live only — /productions —
-# not recorded, see STORAGE.md §4). The battery stays behind the meter: imp/exp/pv are unchanged and vZEV only ever sees
-# the grid values. A site without a battery seals no battery values, so its
+# not recorded, see STORAGE.md §4). The battery stays behind the meter: imp/exp/pv are unchanged. A site without a battery seals no battery values, so its
 # records keep their four-field shape.
 
 var meter = module()
@@ -249,21 +248,6 @@ def _close_slot()
         var dis = _s['n_bat'] > 0 ? int(_s['acc_dis'] + 0.5) : nil
         if imp != nil || pv != nil
             store.push_15m(_s['slot_ts'], imp, exp, pv, chg, dis)
-            # Hand the sealed slot to the vZEV backend (spec 005 FR-503) so it
-            # multicasts it and runs allocation. Optional dependency: guarded so
-            # the meter keeps working when vzev.be is absent (e.g. CLI tests).
-            # Gated on main.be's `_vzev_loaded` boot flag — a bare `import vzev`
-            # here would compile the whole ~21 KB module on the first slot close
-            # even on sites that don't participate in a community, defeating the
-            # lazy vzev loading (startup-heap issue #2).
-            try
-                import global
-                if global.contains('_vzev_loaded') && global._vzev_loaded
-                    import vzev
-                    vzev.announce_slot(_s['slot_ts'], imp != nil ? imp : 0, exp != nil ? exp : 0)
-                end
-            except ..
-            end
         end
     end
 end

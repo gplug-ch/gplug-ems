@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-A Tasmota Berry scripting backend for an Energy Management System (EMS) targeting the vZEV (virtual energy community) use case. It runs as a `.tapp` (Tasmota app) on ESP32-based devices running Tasmota firmware.
+A Tasmota Berry scripting backend for an Energy Management System (EMS) that distributes a site's PV surplus to controllable loads. It runs as a `.tapp` (Tasmota app) on ESP32-based devices running Tasmota firmware.
 
 ## Build commands
 
@@ -54,10 +54,10 @@ them via `introspect.get(d, event_type)` and calls `f(d, cmd, idx, payload,
 raw)` — Berry drops the excess arguments on the zero-arg hooks.
 
 ### Module load order (`autoexec.be`)
-`autoexec.be` is the Tasmota entry point. It stashes the `.tapp` working directory in `global._tapp_wd`, adds it to `sys.path()`, waits for the WiFi station to be up (bounded, ~30 s) plus a 5 s settle, and only then `load()`s ONLY `main.be` — compiling the graph at the first tick overlaps WiFi association on the ESP32-C3 and hard-faults into a boot loop (2026-09-07). `main.be` imports the rest of the graph (`webservice`, `udpdriver`, `site -> integrations`, `ems`, `store`, `meter`, `configservice`, `vzev`), so every module is built exactly once through the import cache — load()'ing each module explicitly compiled them twice and doubled the boot heap.
+`autoexec.be` is the Tasmota entry point. It stashes the `.tapp` working directory in `global._tapp_wd`, adds it to `sys.path()`, waits for the WiFi station to be up (bounded, ~30 s) plus a 5 s settle, and only then `load()`s ONLY `main.be` — compiling the graph at the first tick overlaps WiFi association on the ESP32-C3 and hard-faults into a boot loop (2026-09-07). `main.be` imports the rest of the graph (`logger`, `webservice`, `site`, `ems`, `store`, `meter`, `drivershim`, plus only the integrations `site.json` actually uses; `configservice` is imported lazily on the first `POST /api/config`), so every module is built exactly once through the import cache — load()'ing each module explicitly compiled them twice and doubled the boot heap.
 
 ### Service lifecycle (`main.be`)
-`main.be` calls `webservice.start()` and `udpdriver.start()` after a 2-second delay (to ensure the Tasmota runtime is ready). Both services register themselves as Tasmota drivers via `tasmota.add_driver(self)`.
+`main.be` polls for WiFi association (first check after 5 s, then every second, giving up after ~30 s) and then runs `start_services()`: `webservice.start()`, the lazy `/api/config` stub, `site.load_config()`, `ems.start()`, `store.load()` and `meter.start()` — each as a separate `_stage()` so one failing service is logged by name and does not abort the rest. Driver modules register via a `drivershim.be` instance (see above).
 
 ### Core modules
 
@@ -66,10 +66,9 @@ raw)` — Berry drops the excess arguments on the zero-arg hooks.
 | `ems.be` | EMS state machine: greedy priority-based allocation. `every_second` runs allocation (pure — it only updates cached state and QUEUES relay writes) and advances `site`'s outbound-HTTP scheduler by exactly one op. No HTTP is fired inline from allocation. |
 | `site.be` | Digital twin + **outbound-HTTP scheduler**: ALL integration reads and relay writes go through a one-op-per-tick scheduler (round-robin `poll_step` + an actuation queue drained by `actuate_step`), deferred while a response streams (`serving_recent`). This one-`webclient()`-per-tick cap is the fix for the ESP32-C3 heap OOM caused by burst fetches. Never fetch inline. |
 | `webservice.be` | HTTP endpoints: `GET /fs?name=<file>` (file serving from filesystem or tapp), `GET /config`, `GET /messages`, `GET /messages/last`, `POST /messages`, `GET /api/meter` (raw Tasmota-SMI `z` passthrough, spec 007 — via the shared `gplug.read_z()`, or the cached simulated meter for dev; no webclient) |
-| `messaging/udpdriver.be` | UDP multicast transport: reads the group/port from `site.json`'s `messaging.udp` block (defaults `239.3.0.1:5007`), exposes one receive callback (`set_on_receive`/`get_on_receive` — vzev chains the prior one, FR-508). Wraps each payload in a `{from,timestamp,msg}` JSON envelope and polls the socket via the `every_250ms()` Tasmota driver hook. (The former `udpclient.be` pass-through was folded in here, issue #9.) |
-| `meter.be` | Samples grid / PV / battery / active-load power every 10 s from the cached site twin (never fetches itself), integrates `W * dt / 3600` into Wh and seals a record at each 15-min boundary via `store.push_15m()`, then hands the slot to `vzev.announce_slot()`. Keeps a 90-entry RAM sample ring for `GET /api/power`. |
-| `fsx.be` | Filesystem seam (Berry CLI `os` vs Tasmota `path`) plus the bucket-file helpers `store.be` and `vzev.be` share: `split_prefix`, `dayno`, `list_daynos`, `sort_ints`, `close_q` (issue #9). |
-| `logger.be` | Levels: `lOff=0, lInfo=1, lWarn=2, lDebug=3, lMore=4`. Default level is Warn (2). All output prefixed with `gUDP:`. |
+| `meter.be` | Samples grid / PV / battery / active-load power every 10 s from the cached site twin (never fetches itself), integrates `W * dt / 3600` into Wh and seals a record at each 15-min boundary via `store.push_15m()`. Keeps a 90-entry RAM sample ring for `GET /api/power`. |
+| `fsx.be` | Filesystem seam (Berry CLI `os` vs Tasmota `path`) plus the bucket-file helpers of `store.be`: `split_prefix`, `dayno`, `list_daynos`, `sort_ints`, `close_q` (issue #9). |
+| `logger.be` | Levels: `lOff=0, lInfo=1, lWarn=2, lDebug=3, lMore=4`. Default level is Warn (2). All output prefixed with `EMS:`. |
 
 ### API / Webservice
 
@@ -79,12 +78,11 @@ All API endpoints are defined in `webservice.be`. Tasmota only supports a single
 Loads have three states: `inactive` (user-deselected), `waiting` (requested but insufficient power), `active` (running). On each power update, candidates (waiting/active loads) are sorted by ascending `priority` and greedily activated: a load becomes active if remaining available power ≥ its rated `power`. Allocation itself is pure: a transition calls `site.set_load_state()`, which updates RAM state and QUEUES the relay write; the actual integration HTTP call is issued later by `site.scheduler_step()`, one op per tick.
 
 ### Configuration files
-- `site.json` — the only device config: site metadata, `loads` (id, friendlyName, loadType, priority, currentPower, minimalDuration, integration, url), `productions`, `grid` (`from`/`to` items), `tariffs`, an optional top-level `meter` block (spec 007) and `messaging.udp` (`multicast_ip`, `port`; defaults `239.3.0.1:5007`). Read by `site.load_config()`, served and written by `configservice.be`.
-- `/vzev.json` — vZEV member registry (id, name, location, type `PRODUCER`/`CONSUMER`, url), written by `vzev.be`.
-- There is no `ems.json` and no `udpclient.json` — both were folded into `site.json`.
+- `site.json` — the only device config: site metadata, `loads` (id, friendlyName, loadType, priority, currentPower, minimalDuration, integration, url), `productions`, `grid` (`from`/`to` items), `tariffs`, an optional top-level `meter` block (spec 007). Read by `site.load_config()`, served and written by `configservice.be`.
+- There is no `ems.json` — it was folded into `site.json`.
 
 ### Build artifacts
 The Makefile minifies Berry sources with `minify.py` (strips `#` comments, collapses blank lines), runs the Vite build in `../frontend` (which bakes the versioned CDN URLs into the `index.html` shell) and always runs `bundle.py --lang-only` for the i18n completeness check, then zips everything into `build/ems-v<VERSION>.tapp` (`-<lang>` suffix when `LANG` is set). The `.tapp` is a standard zip with no compression (`-0`). In the default CDN mode the hashed JS/CSS **and `lang.json`** stay on GitHub Pages (`gplug-ch/gplug-cdn`) and only the shell is packed; `make ASSET_BASE=self` packs the assets and `lang.json` into the `.tapp` and points the shell at `/fs?name=`.
 
 ### Testing
-`tests/tasmota.be` is a stub for the Tasmota built-in `tasmota` module (unavailable in Berry CLI). Tests that need `webclient` define their own stub at global scope before `import ems`. Test data fixtures are in `tests/site.json` (plus `tests/vzev/` and `tests/netgate/`).
+`tests/tasmota.be` is a stub for the Tasmota built-in `tasmota` module (unavailable in Berry CLI). Tests that need `webclient` define their own stub at global scope before `import ems`. Test data fixtures are in `tests/site.json` (plus `tests/netgate/`, `tests/battery/` and `tests/modbus/`).

@@ -11,7 +11,6 @@ import * as ui from '../ui.js';
 import * as agg from '../lib/aggregate.js';
 import * as insights from '../lib/insights.js';
 import * as csv from '../lib/csv.js';
-import * as vz from '../lib/vzev.js';
 import * as archive from '../lib/archive.js';
 
 var PAGE_SIZES = [10, 25, 50];
@@ -95,13 +94,6 @@ var PAGE_SIZES = [10, 25, 50];
     return k === null ? '–' : fmt.num(k, decimals === undefined ? 2 : decimals);
   }
 
-  /* signed CHF span, green +/red − (FR-404). */
-  function chfSpan(v) {
-    if (v === null || v === undefined) return html`<span>–</span>`;
-    var cls = v > 0 ? 'val-pos' : v < 0 ? 'val-neg' : '';
-    return html`<span class=${cls}>${fmt.chf(v, true)}</span>`;
-  }
-
   /* plain CHF span, always green when positive (savings / import cost). */
   function chfPlain(v, cls) {
     if (v === null || v === undefined) return html`<span>–</span>`;
@@ -131,12 +123,6 @@ var PAGE_SIZES = [10, 25, 50];
       cols.push({ key: 'batchg', label: t('history.col.batcharge'), unit: '[kWh]', align: 'right' });
       cols.push({ key: 'batdis', label: t('history.col.batdischarge'), unit: '[kWh]', align: 'right' });
     }
-    cols.push({
-      key: 'vzev',
-      label: producer ? t('history.col.vzevexport') : t('history.col.vzevimport'),
-      unit: '[kWh]', align: 'right'
-    });
-    cols.push({ key: 'saldo', label: t('history.col.vzevsaldo'), unit: '[CHF]', align: 'right' });
     if (producer) {
       cols.push({ key: 'saving', label: t('history.col.selfuse'), unit: '[CHF]', align: 'right' });
       /* spec 008 derived per-period columns (UC-803) */
@@ -152,10 +138,11 @@ var PAGE_SIZES = [10, 25, 50];
     return (ratio === null || ratio === undefined) ? '–' : fmt.num(ratio * 100, 0) + ' %';
   }
 
-  /* Derived per-row display values from an energy record. */
-  function rowVzevSaldo(r) {
-    var rev = r.revenue_vzev_chf, cost = r.cost_vzev_chf;
-    if (rev === null && cost === null) return null;
+  /* Grid saldo of a row: feed-in revenue minus import cost (CHF), or null
+     when neither is known. */
+  function rowGridSaldo(r) {
+    var rev = r.revenue_feedin_chf, cost = r.cost_import_chf;
+    if ((rev === null || rev === undefined) && (cost === null || cost === undefined)) return null;
     return (rev || 0) - (cost || 0);
   }
 
@@ -246,24 +233,18 @@ var PAGE_SIZES = [10, 25, 50];
             ? archive.range(st.siteId, winFrom, now).catch(function () { return null; })
             : api.getEnergy('15m', cfg.count).catch(function () { return null; }),
           api.getMeta().catch(function () { return null; }),
-          api.getProductions().catch(function () { return null; }),
-          /* own vZEV share: derived from the archived peer slots (FR-1105) */
-          useArchive
-            ? archive.rawRange(st.siteId, winFrom, now).catch(function () { return null; })
-            : Promise.resolve(null)
+          api.getProductions().catch(function () { return null; })
         ]).then(function (res) {
           if (cancelled) return;
           var energy = res[0];
           var meta = res[1];
           var prods = res[2];
-          var vzevRaw = res[3];
           if (energy === null) {
             setData({ records: null, tariffs: {}, producer: false,
                       err: true, archived: false, coverage: null });
             setLoading(false);
             return;
           }
-          if (vzevRaw) energy = vz.withOwnShare(energy, vzevRaw);
           var tariffs = (meta && meta.tariffs) || {};
           var producer = Array.isArray(prods) && prods.some(function (p) {
             return p && p.productionType === 'PHOTOVOLTAIC';
@@ -309,14 +290,10 @@ var PAGE_SIZES = [10, 25, 50];
     var hasBattery = rows.some(function (r) { return r.bat_chg_wh != null || r.bat_dis_wh != null; });
     var columns = buildColumns(data.producer, hasFeedin, htnt, hasBattery);
 
-    /* spec 008 KPI opts: vZEV variant only when the selection carries vZEV
-       flows; CO₂ factor from tariffs (default 128, 0 hides). */
-    var vzevActive = rows.some(function (r) {
-      return (r.vzev_in_wh || 0) > 0 || (r.vzev_out_wh || 0) > 0;
-    });
+    /* spec 008 KPI opts: CO₂ factor from tariffs (default 128, 0 hides). */
     var co2Factor = (data.tariffs.co2_g_kwh === undefined || data.tariffs.co2_g_kwh === null || data.tariffs.co2_g_kwh === '')
       ? 128 : Number(data.tariffs.co2_g_kwh);
-    var kpiOpts = { tariffs: data.tariffs, vzev: vzevActive, co2: co2Factor };
+    var kpiOpts = { tariffs: data.tariffs, co2: co2Factor };
     var showSaving = (Number(data.tariffs.grid_import_chf_kwh) > 0) || (Number(data.tariffs.grid_feedin_chf_kwh) > 0);
 
     /* per-row derived KPIs (UC-803 table/CSV columns), keyed by row ts */
@@ -324,12 +301,12 @@ var PAGE_SIZES = [10, 25, 50];
       var m = {};
       rows.forEach(function (r) { m[r.ts] = insights.kpis([r], kpiOpts); });
       return m;
-    }, [rows, data.tariffs, vzevActive, co2Factor]);
+    }, [rows, data.tariffs, co2Factor]);
 
     /* one KPI set over the whole visible selection (FR-803) */
     var kpiSummary = useMemo(function () {
       return insights.kpis(rows, kpiOpts);
-    }, [rows, data.tariffs, vzevActive, co2Factor]);
+    }, [rows, data.tariffs, co2Factor]);
 
     /* Where the visible history ends (FR-403). With the archive that is the
        oldest archived slot; without one it is the far edge of the device
@@ -359,15 +336,15 @@ var PAGE_SIZES = [10, 25, 50];
       var header = columns.map(function (c) {
         return c.label + (c.unit ? ' ' + c.unit : '');
       });
-      var body = rows.map(function (r) { return rowToCsv(r, columns, resKey, data.producer, rowKpis[r.ts]); });
+      var body = rows.map(function (r) { return rowToCsv(r, columns, resKey, rowKpis[r.ts]); });
       var text = csv.build(header, body);
       download(csv.filename(resKey), text);
     }
 
     /* ---- chart series ---- */
     var chart = useMemo(function () {
-      return buildChart(chartWindow(rows, resKey), chartMode, chfMode, data.producer);
-    }, [rows, chartMode, chfMode, data.producer, resKey]);
+      return buildChart(chartWindow(rows, resKey), chartMode, chfMode);
+    }, [rows, chartMode, chfMode, resKey]);
 
     /* ---- summary strip (FR-408) ---- */
     var summary = useMemo(function () {
@@ -401,7 +378,7 @@ var PAGE_SIZES = [10, 25, 50];
           <div>
             ${rows.length ? html`<${SummaryStrip} summary=${summary} kpis=${kpiSummary} showSaving=${showSaving} />` : null}
 
-            <${ui.Card} group="vzev" title=${t('history.chart.title')}>
+            <${ui.Card} group="grid" title=${t('history.chart.title')}>
               <div class="chart-toolbar">
                 <div class="seg-toggle" role="tablist" aria-label=${t('history.chart.mode')}>
                   ${[['net', 'history.chart.mode_net'], ['bilanz', 'history.chart.mode_bilanz']].map(function (m) {
@@ -448,7 +425,7 @@ var PAGE_SIZES = [10, 25, 50];
                   <tbody>
                     ${total === 0 ? html`
                       <tr><td class="table-empty" colspan=${columns.length}>${t('common.nodata')}</td></tr>` :
-                      visible.map(function (it) { return renderItem(it, columns, resKey, peakTs, data.producer, rowKpis); })}
+                      visible.map(function (it) { return renderItem(it, columns, resKey, peakTs, rowKpis); })}
                   </tbody>
                 </table>
 
@@ -506,7 +483,7 @@ var PAGE_SIZES = [10, 25, 50];
     return out;
   }
 
-  function renderItem(it, columns, resKey, peakTs, producer, rowKpis) {
+  function renderItem(it, columns, resKey, peakTs, rowKpis) {
     if (it.kind === 'boundary') {
       return html`<tr key=${it.key} class="verlauf-boundary">
         <td colspan=${columns.length}>${t('history.boundary_finer_end')}</td></tr>`;
@@ -522,13 +499,13 @@ var PAGE_SIZES = [10, 25, 50];
       <tr key=${'r' + r.ts}>
         ${columns.map(function (c) {
           return html`<td key=${c.key} class=${c.align === 'right' ? 'ta-r' : ''}>
-            ${cellContent(c.key, r, resKey, isPeak, producer, k)}
+            ${cellContent(c.key, r, resKey, isPeak, k)}
           </td>`;
         })}
       </tr>`;
   }
 
-  function cellContent(key, r, resKey, isPeak, producer, k) {
+  function cellContent(key, r, resKey, isPeak, k) {
     switch (key) {
       case 'ts':
         return html`<span class="verlauf-ts">
@@ -543,8 +520,6 @@ var PAGE_SIZES = [10, 25, 50];
       case 'exp': return numCell(r.exp_wh);
       case 'batchg': return numCell(r.bat_chg_wh);
       case 'batdis': return numCell(r.bat_dis_wh);
-      case 'vzev': return numCell(vzevQty(r, producer));
-      case 'saldo': return chfSpan(rowVzevSaldo(r));
       case 'saving': return chfPlain(r.saving_selfuse_chf, r.saving_selfuse_chf > 0 ? 'val-pos' : '');
       case 'autarky': return pctCell(k && k.autarky);
       case 'selfuserate': return pctCell(k && k.selfuse);
@@ -553,14 +528,7 @@ var PAGE_SIZES = [10, 25, 50];
     }
   }
 
-  /* vZEV quantity shown in the single vZEV column: producers export (out),
-     consumers import (in). The column header already disambiguates, so the
-     value must match the site type — not the larger of the two flows. */
-  function vzevQty(r, producer) {
-    return (producer ? r.vzev_out_wh : r.vzev_in_wh) || 0;
-  }
-
-  function rowToCsv(r, columns, resKey, producer, k) {
+  function rowToCsv(r, columns, resKey, k) {
     return columns.map(function (c) {
       switch (c.key) {
         case 'ts': return fmt.time(r.ts, RES[resKey].tk);
@@ -571,8 +539,6 @@ var PAGE_SIZES = [10, 25, 50];
         case 'exp': return csvNum(r.exp_wh);
         case 'batchg': return csvNum(r.bat_chg_wh);
         case 'batdis': return csvNum(r.bat_dis_wh);
-        case 'vzev': return csvNum(vzevQty(r, producer));
-        case 'saldo': return csvChf(rowVzevSaldo(r));
         case 'saving': return csvChf(r.saving_selfuse_chf);
         case 'autarky': return csvPct(k && k.autarky);
         case 'selfuserate': return csvPct(k && k.selfuse);
@@ -618,11 +584,11 @@ var PAGE_SIZES = [10, 25, 50];
      by timestamp), so gaps/outliers can't skew the layout.
 
      Sign convention (issue #17, app-wide): what the site GIVES sits above the
-     0-axis (Einspeisung / vZEV-Abgabe, green; CHF credit), what it TAKES sits
+     0-axis (Einspeisung, green; CHF credit), what it TAKES sits
      below it (Netzbezug, red; CHF cost). The Netz-kWh mode used to draw
      Netzbezug upward, which read the opposite way round from the Bilanz mode
      and from the CHF saldo — all three now agree. */
-  function buildChart(rows, chartMode, chfMode, producer) {
+  function buildChart(rows, chartMode, chfMode) {
     var chron = rows.slice().sort(function (a, b) { return a.ts - b.ts; });
     var num2 = function (v) { return fmt.num(v, 2); };
     var toK = function (wh) { return (wh === null || wh === undefined) ? 0 : wh / 1000; };
@@ -671,8 +637,8 @@ var PAGE_SIZES = [10, 25, 50];
     if (chfMode) {
       points = chron.map(function (r) {
         if (r.__blank) return { t: r.ts, y: null }; /* missing slot → blank */
-        var sld = rowVzevSaldo(r);
-        return { t: r.ts, y: sld === null ? null : sld, color: (sld || 0) < 0 ? 'var(--c-import)' : 'var(--c-vzev)' };
+        var sld = rowGridSaldo(r);
+        return { t: r.ts, y: sld === null ? null : sld, color: (sld || 0) < 0 ? 'var(--c-import)' : 'var(--c-export)' };
       });
     } else {
       points = chron.map(function (r) {
@@ -682,10 +648,10 @@ var PAGE_SIZES = [10, 25, 50];
           return { t: r.ts, y: -imp, color: 'var(--c-import)',
                    label: t('history.chart.legend_import') };
         }
-        var ex = vzevQty(r, producer);
+        var ex = r.exp_wh;
         var exk = ex === null || ex === undefined ? null : ex / 1000;
         if (exk && exk > 0) {
-          return { t: r.ts, y: exk, color: 'var(--c-vzev)',
+          return { t: r.ts, y: exk, color: 'var(--c-export)',
                    label: t('history.chart.legend_export') };
         }
         return { t: r.ts, y: imp === null ? null : 0, color: 'var(--c-import)',
@@ -701,10 +667,10 @@ var PAGE_SIZES = [10, 25, 50];
          saldo is money owed), so it stays signed. */
       signedMagnitude: !chfMode,
       legend: chfMode ? [
-        { color: 'var(--c-vzev)', label: t('history.chart.legend_saldo') },
+        { color: 'var(--c-export)', label: t('history.chart.legend_saldo') },
         { color: 'var(--c-import)', label: t('history.chart.legend_import') }
       ] : [
-        { color: 'var(--c-vzev)', label: t('history.chart.legend_export') },
+        { color: 'var(--c-export)', label: t('history.chart.legend_export') },
         { color: 'var(--c-import)', label: t('history.chart.legend_import') }
       ]
     };

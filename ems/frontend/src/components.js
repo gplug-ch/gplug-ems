@@ -16,7 +16,7 @@ import { t } from './i18n.js';
   }
 
   /* ---- Card — 4px left accent in group color (FR-207) ----
-     group: 'grid' | 'production' | 'loads' | 'vzev' | undefined
+     group: 'grid' | 'production' | 'loads' | undefined
      collapsible: header gets a caret toggle that hides the body. With
      `collapseKey` the open/closed choice survives navigation and reloads via
      localStorage (per-browser convenience only — never app state). */

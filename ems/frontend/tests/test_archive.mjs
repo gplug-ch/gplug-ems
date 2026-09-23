@@ -15,7 +15,7 @@ const SITE = 'site-a';
    It mirrors webservice.energyrequest() AFTER the FR-1103 paging change:
    with `from`, the OLDEST `count` records at or after `from`; without it, the
    newest `count`. */
-function device(slots, raw) {
+function device(slots) {
   const calls = [];
   return {
     calls,
@@ -29,8 +29,7 @@ function device(slots, raw) {
         sel = slots.slice(-count);
       }
       return Promise.resolve(sel.map((r) => Object.assign({}, r)));
-    },
-    getVzevRaw() { return Promise.resolve(raw || null); }
+    }
   };
 }
 
@@ -103,39 +102,19 @@ test('gap detection across a range the device no longer covers', async () => {
   assert.deepStrictEqual(cov.gaps, [[T0 + 4 * SLOT, T0 + 399 * SLOT]]);
 });
 
-test('peer slots: last triple for a ts wins, like vzev.peerSlot()', async () => {
-  const site = await freshSite('peers');
-  const raw = {
-    producer_id: 'prod', self_id: 'me',
-    tariffs: { vzev_import_chf_kwh: 0.2 },
-    data: {
-      prod: [T0, 0, 500, T0 + SLOT, 0, 600],
-      me: [T0, 300, 0, T0, 350, 0]            /* correction appended for T0 */
-    }
-  };
-  await archive.sync(device(series(2), raw), site);
-  const back = await archive.rawRange(site, T0, T0 + SLOT);
-  assert.strictEqual(back.producer_id, 'prod');
-  assert.strictEqual(back.self_id, 'me');
-  assert.deepStrictEqual(back.tariffs, { vzev_import_chf_kwh: 0.2 });
-  assert.deepStrictEqual(back.data.me, [T0, 350, 0]);
-  assert.deepStrictEqual(back.data.prod, [T0, 0, 500, T0 + SLOT, 0, 600]);
-});
-
-test('rawRange restricts to the requested window', async () => {
-  const site = await freshSite('rawrange');
-  const raw = { producer_id: 'p', self_id: 'me', data: {
-    p: [T0, 0, 100, T0 + SLOT, 0, 200, T0 + 2 * SLOT, 0, 300]
-  } };
-  await archive.sync(device(series(3), raw), site);
-  const back = await archive.rawRange(site, T0 + SLOT, T0 + SLOT);
-  assert.deepStrictEqual(back.data.p, [T0 + SLOT, 0, 200]);
+test('an older export with community `v` rows still imports (rows ignored)', async () => {
+  const site = await freshSite('legacy-v');
+  const text = '\ufeffgplug-archive;2;' + site + '\r\n' +
+    'e;' + T0 + ';100;0;50;0;;\r\n' +
+    'v;' + T0 + ';peer;300;0;\r\n';
+  const cov = await archive.importText(text, site);
+  assert.strictEqual(cov.count, 1);
+  assert.ok((await archive.exportText(site)).indexOf('\r\nv;') < 0, 'no v rows exported');
 });
 
 test('export/import round-trip is stable and refuses a foreign site', async () => {
   const site = await freshSite('export');
-  const raw = { producer_id: 'p', self_id: site, data: { p: [T0, 0, 500] } };
-  await archive.sync(device(series(8), raw), site);
+  await archive.sync(device(series(8)), site);
   const text = await archive.exportText(site);
 
   await archive.clearSite(site);

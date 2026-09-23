@@ -29,13 +29,13 @@ const DEV_PORT = Number(process.env.DEV_SERVER_PORT || 5173);
  *                                running `npm run dev` server, with HMR)
  *   ASSET_BASE = "<url>"      -> https://<url>/<version>/  (internal mirror)
  *
- * The version comes from ems/backend/VERSION.txt (the Makefile passes it in as
+ * The version comes from the repo-root VERSION.txt (the Makefile passes it in as
  * APP_VERSION); a standalone `npm run build` reads the file directly. Output is
  * nested under the version (dist/<version>/) so `wrangler pages deploy dist`
  * publishes assets at https://<host>/<version>/... matching the baked-in base.
  * ------------------------------------------------------------------------- */
 
-const versionFile = fileURLToPath(new URL('../backend/VERSION.txt', import.meta.url));
+const versionFile = fileURLToPath(new URL('../../VERSION.txt', import.meta.url));
 const version = (process.env.APP_VERSION ||
   'v' + readFileSync(versionFile, 'utf8').trim()).trim();
 
@@ -86,7 +86,7 @@ function buildLangDict() {
 }
 
 // Device endpoints proxied in dev (see `server.proxy` below). `/api` covers
-// /api/power|energy|meta|meter|config|vzev/*; /cm is the Tasmota command
+// /api/power|energy|meta|meter|modbus|config; /cm is the Tasmota command
 // endpoint used for Wi-Fi settings and restart.
 const DEV_DEVICE_URL = process.env.DEV_DEVICE_URL || '';
 const DEVICE_PATHS = ['/api', '/loads', '/productions', '/site', '/fs', '/cm'];

@@ -3,10 +3,9 @@
 # `path`, no `os`). Detected once at runtime and cached (mirrors
 # configservice.be's/store.be's own former _has_path()/_remove_file()).
 #
-# Also home of the bucket-file helpers store.be and vzev.be share (issue #9):
-# both keep append-only per-day files named <prefix><kind>_<dayno>, so the
-# prefix split, day-number math, bucket discovery and quiet close live here
-# once instead of twice in resident bytecode.
+# Also home of store.be's bucket-file helpers (issue #9): append-only per-day
+# files named <prefix><kind>_<dayno> — prefix split, day-number math, bucket
+# discovery and quiet close.
 
 var fsx = module()
 

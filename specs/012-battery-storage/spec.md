@@ -27,7 +27,6 @@ charge and discharge energy **behind the meter**.
 |---|---|
 | Active control or observe? | **Observe only.** No setpoint write path. Active control is a later issue. |
 | Allocation | **Loads before battery**: `available` = non-battery productions. Discharge never activates a load; power a battery charges with counts as surplus a load may take (a self-consumption inverter charges from surplus only). |
-| vZEV exchange / billing | **Not affected.** The battery is behind the meter; vZEV only ever sees the grid values. |
 | First integrations | gplug (SunSpec/Modbus), Home Assistant, Simulator. |
 
 **Reference device:** Home Assistant instance `192.168.0.138:8123` (Loxone battery):
@@ -49,7 +48,7 @@ charge and discharge energy **behind the meter**.
 - **FR-1203 Allocation.** `ems.be` leaves `productionType == "BATTERY"` out of `available`.
 - **FR-1204 Energy.** `meter.be` integrates `bat_w` split by sign into charge / discharge Wh. A slot with
   battery samples is sealed as a **7-field line** `delta,imp,exp,pv,chg,dis,` (reserved empty 7th
-  field, so the line can't be confused with the legacy 6-field vZEV tail) and served as `bat_chg_wh`/`bat_dis_wh`. A
+  field, so the line can't be confused with a legacy 6-field line, whose two-field tail is ignored) and served as `bat_chg_wh`/`bat_dis_wh`. A
   site without a battery writes the 4-field line unchanged. imp/exp/pv are untouched. Append-only.
   The SoC is **not** recorded: with it the worst-case flash headroom fell below the 40 KB rule
   (STORAGE.md §4).

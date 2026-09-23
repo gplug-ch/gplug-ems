@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import * as agg from '../src/lib/aggregate.js';
 
 const fx = JSON.parse(readFileSync(new URL('./fixtures/rollup_parity.json', import.meta.url)));
-const WH = ['imp_wh', 'exp_wh', 'pv_wh', 'vzev_in_wh', 'vzev_out_wh'];
+const WH = ['imp_wh', 'exp_wh', 'pv_wh'];
 
 function byTs(rows) {
   const m = new Map();
@@ -21,9 +21,8 @@ function byTs(rows) {
   return m;
 }
 
-/* The device stores vzev_in/out as 0 when unset; the archive keeps the raw
-   record and joins the browser-computed share (FR-1105). The fixture already
-   carries the device's values so the roll-up itself is what is compared. */
+/* The fixture also carries the device's former community-share fields; only
+   the raw Wh fields are compared. */
 function parity(target, deviceRows) {
   const js = agg.aggregate(fx.input, '15m', target, {});
   const dev = byTs(deviceRows);

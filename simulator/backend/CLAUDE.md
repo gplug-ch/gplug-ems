@@ -19,7 +19,7 @@ Run a single test class:
 
 ## Architecture
 
-Spring Boot 4 / Kotlin / Java 21 backend that simulates energy loads and photovoltaic systems for the VZEV (Virtual Zero Energy Vehicle) project. It is the backend counterpart of a React frontend and exposes a REST API consumed by both the frontend simulator UI and by EMS (Energy Management System) logic.
+Spring Boot 4 / Kotlin / Java 21 backend that simulates energy loads and photovoltaic systems for the gPlug EMS project. It is the backend counterpart of a React frontend and exposes a REST API consumed by both the frontend simulator UI and by EMS (Energy Management System) logic.
 
 **Package root:** `ch.gplug.simulator`
 

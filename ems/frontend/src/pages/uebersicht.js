@@ -1,5 +1,5 @@
 /* Übersicht — live energy monitor (spec 003, FR-301..FR-310).
-   Four group-accented panels (Netzanschluss, Erzeuger, Lasten, vZEV), all
+   Three group-accented panels (Netzanschluss, Erzeuger, Lasten), all
    charts sharing one 15-min time window with labeled axes. Live power in
    W/kW (never kWh). Polls /api/power + /loads + /productions every 10 s,
    /site once; pauses when the tab is hidden (via api.poll). */
@@ -9,7 +9,6 @@ import { fmt } from '../format.js';
 import { api } from '../api.js';
 import { toast } from '../components.js';
 import * as ui from '../ui.js';
-import * as vz from '../lib/vzev.js';
 import * as archive from '../lib/archive.js';
 import * as insights from '../lib/insights.js';
 
@@ -171,7 +170,6 @@ import * as insights from '../lib/insights.js';
     var s = props.newest;                 /* newest /api/power sample or null */
     var win = props.win;
     var power = props.power;                /* raw /api/power {now, samples} or null */
-    var vzevW = props.vzevW;               /* signed vZEV flow (+import, -export) or null */
 
     /* All four figures come from the meter's energy balance (see gridSeries),
        never from the EMS-controllable load list — otherwise Verbrauch reads 0
@@ -212,15 +210,11 @@ import * as insights from '../lib/insights.js';
             value=${fmt.w(exportW)} />
           <${Stat} color="var(--c-import)" dir="in" label=${t('stat.gridop')}
             tooltip=${t('tooltip.gridop')} value=${fmt.w(gridOpImport)} />
-          ${vzevW !== null ? html`
-            <${Stat} color="var(--c-vzev)" dir=${vzevW >= 0 ? 'in' : 'out'}
-              label=${vzevW >= 0 ? t('stat.vzev_import') : t('stat.vzev_export')}
-              tooltip=${t('tooltip.vzev')} value=${fmt.w(Math.abs(vzevW))} />` : null}
         </div>
         <${ui.LineChart} height=${210} yUnit="W" xUnit="h" timeWindow=${win}
           yFormat=${fmt.w}
           bands=${[
-            { top: prodPts, bottom: consPts, color: 'var(--c-vzev-fill)' },
+            { top: prodPts, bottom: consPts, color: 'var(--c-export-fill)' },
             { top: consPts, bottom: prodPts, color: 'var(--c-import-fill)' }
           ]}
           series=${[
@@ -331,54 +325,13 @@ import * as insights from '../lib/insights.js';
       <//>`;
   }
 
-  /* ================= vZEV panel (FR-310: hidden if no data, or opted out) ================= */
-  function VzevPanel(props) {
-    var members = props.members;
-    if (!props.enabled || !members || !members.length) return null;
-    return html`
-      <${ui.Card} group="vzev" title=${t('panel.vzev')} tooltip=${t('tooltip.vzev')}
-        collapsible collapseKey="uebersicht.vzev"
-        defaultOpen=${false}>
-        <div class="ov-subgrid">
-          ${members.map(function (m) {
-            var exporting = (m.net_wh || 0) < 0;
-            /* vZEV exchange is 15-min energy (Wh), not live power — derive the
-               chart window from the member's own flow slots (FR-513). */
-            var raw = m.points || [];
-            /* App-wide sign convention (issue #17): energy this site GIVES the
-               community is drawn above the 0-axis, energy it TAKES below it.
-               `m.points` are unsigned magnitudes (insights.vzevPowerNow relies
-               on that), so the direction is applied here, for display only. */
-            var pts = exporting ? raw : raw.map(function (p) {
-              return { t: p.t, y: (p.y === null || p.y === undefined) ? p.y : -p.y };
-            });
-            var vwin = pts.length ? [pts[0].t, pts[pts.length - 1].t + 900] : null;
-            return html`
-              <div key=${m.id} class="ov-sub">
-                <div class="ov-sub-head">
-                  <span class="ov-sub-name">${m.name || m.id}</span>
-                  <span class="ov-sub-value" style="color:var(--c-vzev)">
-                    ${(exporting ? t('stat.vzev_export') : t('stat.vzev_import')) + ' ' + fmt.wh(Math.abs(m.net_wh || 0))}
-                  </span>
-                </div>
-                ${m.address ? html`<div class="ov-sub-meta"><span>${m.address}</span></div>` : null}
-                <${ui.LineChart} height=${140} yUnit="Wh" xUnit="h" timeWindow=${vwin}
-                  yFormat=${function (v) { return fmt.wh(Math.abs(v)); }}
-                  series=${[{ points: pts, color: 'var(--c-vzev)',
-                    label: (exporting ? t('stat.vzev_export') : t('stat.vzev_import')) }]} />
-              </div>`;
-          })}
-        </div>
-      <//>`;
-  }
-
   /* ================= Stromfluss · jetzt (spec 010 FR-1002 / UC-1001) =================
      The live card that leads the page. Haus is the hub: every flow runs
      through it, so the chain reads ☀ PV → 🏠 Haus → ⚡ Netz and the numbers add
      up at Haus (pure insights.hubFlows()). HTML + CSS grid, not SVG — text keeps
      its real size on every screen, and the layout alone switches between a
      vertical chain (narrow card) and a horizontal one (container ≥ 520px).
-     Sources (PV, Batterie) sit before Haus, the grid side (Netz, vZEV) after
+     Sources (PV, Batterie) sit before Haus, the grid side (Netz) after
      it; an edge's arrow flips with its direction (battery charging, grid
      import). Colour follows the energy role (FR-1001) and only reinforces —
      direction is always carried by the arrow and the words. Edge `state`
@@ -388,17 +341,15 @@ import * as insights from '../lib/insights.js';
     pv:   { color: 'var(--c-production)',  label: 'flow.pv' },
     bat:  { color: 'var(--c-battery)',     label: 'flow.battery' },
     haus: { color: 'var(--c-consumption)', label: 'flow.haus' },
-    netz: { color: 'var(--c-grid)',        label: 'flow.netz' },
-    vzev: { color: 'var(--c-vzev)',        label: 'flow.vzev' }
+    netz: { color: 'var(--c-grid)',        label: 'flow.netz' }
   };
   var LIVE_S = 30;             /* newest sample older than this → not «live» */
 
-  /* edge colour by energy role: PV production, battery, vZEV; the grid edge
+  /* edge colour by energy role: PV production, battery; the grid edge
      is green when exporting and red when importing */
   function edgeColor(e) {
     if (e.node === 'pv') return 'var(--c-production)';
     if (e.node === 'bat') return 'var(--c-battery)';
-    if (e.node === 'vzev') return 'var(--c-vzev)';
     return e.dir === 'in' ? 'var(--c-import)' : 'var(--c-export)';
   }
 
@@ -417,7 +368,7 @@ import * as insights from '../lib/insights.js';
      node's own colour and sized to sit inside the ring. Strokes use
      non-scaling-stroke so the 1.7 px weight stays uniform across the g scale,
      matching the app's 1.6–1.8 px currentColor icon family. Sonne=PV,
-     Haus=Verbrauch, Mast=Netz, geteiltes Netz=vZEV, Akku=Batterie. */
+     Haus=Verbrauch, Mast=Netz, Akku=Batterie. */
   function nodeIcon(id, cx, cy, color) {
     var tf = 'translate(' + cx + ' ' + cy + ') scale(1.35)';
     var sk = { fill: 'none', stroke: color, 'stroke-width': '1.7',
@@ -435,13 +386,6 @@ import * as insights from '../lib/insights.js';
     if (id === 'netz') return html`
       <g transform=${tf}>
         <path ...${sk} d="M-5.5 8 L-1.8 -6 M5.5 8 L1.8 -6 M-1.8 -6 L1.8 -6 M-7.5 -4.6 L7.5 -4.6 M-4 0 L4 0 M-4 0 L3.4 5.6 M4 0 L-3.4 5.6 M-4.8 5.6 L4.8 5.6" />
-      </g>`;
-    if (id === 'vzev') return html`
-      <g transform=${tf}>
-        <path ...${sk} d="M0 -6 L-6 5.5 M0 -6 L6 5.5 M-6 5.5 L6 5.5" />
-        <circle cx="0" cy="-6" r="2.1" fill=${color} />
-        <circle cx="-6" cy="5.5" r="2.1" fill=${color} />
-        <circle cx="6" cy="5.5" r="2.1" fill=${color} />
       </g>`;
     if (id === 'bat') return html`
       <g transform=${tf}>
@@ -497,10 +441,9 @@ import * as insights from '../lib/insights.js';
   }
 
   function FlowCard(props) {
-    var hub = insights.hubFlows(props.newest, props.vzevW,
+    var hub = insights.hubFlows(props.newest,
       { pv: props.hasPv, bat: props.hasBattery });
     var head = insights.flowHeadline(hub);
-    var showVzev = props.vzevW !== null && props.vzevW !== undefined;
 
     var badge = html`
       <span class=${'live-badge' + (props.live ? ' is-live' : '')}>
@@ -543,10 +486,9 @@ import * as insights from '../lib/insights.js';
               <div class="hub-haus">
                 <${HubNode} id="haus" node=${hub.nodes.haus} />
               </div>
-              ${tier(['netz', 'vzev'], 'grid')}
+              ${tier(['netz'], 'grid')}
             </div>
           </div>` : html`<div class="hub-empty">${t('flow.status_unknown')}</div>`}
-        ${showVzev ? html`<p class="flow-note">${t('flow.vzev_mean_note')}</p>` : null}
       <//>`;
   }
 
@@ -594,13 +536,13 @@ import * as insights from '../lib/insights.js';
   }
 
   /* grid-crossing segments carry their direction: ← bezogen, → abgegeben */
-  var COVER_ARROWS = { 'comp.grid': '←', 'comp.vzev': '←' };
-  var USAGE_ARROWS = { 'comp.feedin': '→', 'comp.vzev': '→' };
+  var COVER_ARROWS = { 'comp.grid': '←' };
+  var USAGE_ARROWS = { 'comp.feedin': '→' };
 
   function CompositionBars(props) {
     var modeSt = useState('now'); var mode = modeSt[0], setMode = modeSt[1];
     var data = mode === 'now'
-      ? insights.sourcesNow(props.sample, props.vzevW)
+      ? insights.sourcesNow(props.sample)
       : insights.sourcesToday(props.records);
     var fmtV = mode === 'now' ? fmt.w : fmt.wh;
     var battNote = mode === 'today' && props.hasBattery && !data.battery && !data.unknown
@@ -626,7 +568,7 @@ import * as insights from '../lib/insights.js';
     return html`
       <${ui.Card} group="grid" title=${t('flow.comp_title')} collapsible collapseKey="ov.comp"
         defaultOpen=${false}>
-        <${CompositionBars} sample=${props.sample} vzevW=${props.vzevW} records=${props.records}
+        <${CompositionBars} sample=${props.sample} records=${props.records}
           hasBattery=${props.hasBattery} />
       <//>`;
   }
@@ -664,13 +606,8 @@ import * as insights from '../lib/insights.js';
     var sp = k.savingParts;
     var savingTip = sp ? [
       t('kpi.saving_selfuse') + ': ' + fmt.chf(sp.selfuse, true),
-      t('kpi.saving_feedin') + ': ' + fmt.chf(sp.feedin, true),
-      sp.vzev !== null && sp.vzev !== undefined
-        ? t('kpi.saving_vzev') + ': ' + fmt.chf(sp.vzev, true) : null
-    ].filter(Boolean).join('\n') : t('tooltip.kpi_saving');
-
-    var autarkySub = (k.autarkyVzev !== null && k.autarkyVzev !== undefined)
-      ? t('kpi.autarky_vzev') + ': ' + pctText(k.autarkyVzev) : null;
+      t('kpi.saving_feedin') + ': ' + fmt.chf(sp.feedin, true)
+    ].join('\n') : t('tooltip.kpi_saving');
 
     /* the hero is money when we can show it, self-sufficiency otherwise */
     var heroIsSaving = !!props.showSaving;
@@ -686,10 +623,9 @@ import * as insights from '../lib/insights.js';
         </div>`
       : html`
         <div class="kpi-hero">
-          <${Gauge} big ratio=${k.autarky} color="var(--c-vzev)" />
+          <${Gauge} big ratio=${k.autarky} color="var(--c-export)" />
           <div class="kpi-hero-meta">
             <span class="kpi-hero-label">${t('kpi.autarky')}<${ui.Tooltip} text=${incompleteTip || t('tooltip.kpi_autarky')} /></span>
-            ${autarkySub ? html`<span class="kpi-sub">${autarkySub}</span>` : null}
             <span class="kpi-hero-period">${props.period}</span>
           </div>
         </div>`;
@@ -697,8 +633,8 @@ import * as insights from '../lib/insights.js';
     /* supporting tiles — everything the hero didn't take, in priority order */
     var support = [];
     if (heroIsSaving) {
-      support.push(html`<${KpiTile} key="au" gauge ratio=${k.autarky} color="var(--c-vzev)"
-        label=${t('kpi.autarky')} tip=${incompleteTip || t('tooltip.kpi_autarky')} sub=${autarkySub} />`);
+      support.push(html`<${KpiTile} key="au" gauge ratio=${k.autarky} color="var(--c-export)"
+        label=${t('kpi.autarky')} tip=${incompleteTip || t('tooltip.kpi_autarky')} />`);
     }
     support.push(html`<${KpiTile} key="su" gauge ratio=${k.selfuse} color="var(--c-production)"
       label=${t('kpi.selfuse_short')} tip=${incompleteTip || t('tooltip.kpi_selfuse')} />`);
@@ -770,8 +706,6 @@ import * as insights from '../lib/insights.js';
     var powerSt = useState(null); var power = powerSt[0], setPower = powerSt[1];
     var loadsSt = useState([]); var loads = loadsSt[0], setLoads = loadsSt[1];
     var prodsSt = useState([]); var prods = prodsSt[0], setProds = prodsSt[1];
-    var membersSt = useState([]); var members = membersSt[0], setMembers = membersSt[1];
-    var vzevEnabledSt = useState(false); var vzevEnabled = vzevEnabledSt[0], setVzevEnabled = vzevEnabledSt[1];
     var energySt = useState(null); var energy = energySt[0], setEnergy = energySt[1];
     var metaSt = useState(null); var meta = metaSt[0], setMeta = metaSt[1];
     var clockSt = useState(function () { return Math.floor(Date.now() / 1000); });
@@ -841,39 +775,10 @@ import * as insights from '../lib/insights.js';
       return api.poll(function () {
         api.getEnergy('15m', 96)
           .then(function (d) {
-            if (!Array.isArray(d)) return;
-            /* spec 011 FR-1105: the own vZEV share is no longer written into
-               the device record — derive it from the archived peer slots and
-               join it by ts, so the vZEV KPI variant keeps working. */
-            var st = archive.state();
-            if (!st.available || !st.siteId || !d.length) { setEnergy(d); return; }
-            archive.rawRange(st.siteId, d[0].ts, d[d.length - 1].ts)
-              .then(function (raw) {
-                setEnergy(raw && raw.self_id ? vz.withOwnShare(d, raw) : d);
-              }, function () { setEnergy(d); });
+            if (Array.isArray(d)) setEnergy(d);
           })
           .catch(function () { /* KPIs show «—» without data */ });
       }, 60000);
-    }, []);
-
-    /* vZEV member live flow (spec 005, optional). Best-effort: when 005 is not
-       deployed the endpoint 404s and the vZEV panel stays hidden (FR-310). */
-    useEffect(function () {
-      if (!api.getVzevMembers) return;
-      return api.poll(function () {
-        api.getVzevMembers()
-          .then(function (m) { if (Array.isArray(m)) setMembers(m); })
-          .catch(function () { /* 005 not present — leave panel hidden */ });
-      }, 10000);
-    }, []);
-
-    /* the vZEV panel additionally respects the Einstellungen «vZEV aktivieren»
-       toggle (default off) — same live subscription as the Shell's nav gate,
-       so switching it off hides the panel immediately without a reload. */
-    useEffect(function () {
-      var stop = api.onVzevInfo(function (info) { setVzevEnabled(!!(info && info.enabled)); });
-      api.getVzevInfo().catch(function () { /* keep hidden; offline handled by onStatus */ });
-      return stop;
     }, []);
 
     /* poll power + loads + productions every 10 s (FR-309) */
@@ -925,9 +830,6 @@ import * as insights from '../lib/insights.js';
        derives its own consumption/production lines from the same /api/power
        ring inside GridPanel (energy balance, see gridSeries). */
     var ser = powerSeries(power, t0, t1);
-    /* live signed vZEV flow (spec 010 FR-1003, D-2): net of the newest closed
-       slot × 4 (W-equiv), derived from the 005 member data; null without 005. */
-    var vzevW = insights.vzevPowerNow(members);
 
     /* Erzeuger data-quality notice (FR-1005): productions configured but every
        live-PV sample in the window is null → integration/reachability hint,
@@ -945,12 +847,11 @@ import * as insights from '../lib/insights.js';
     var d0 = new Date(); d0.setHours(0, 0, 0, 0);
     var startOfToday = Math.floor(d0.getTime() / 1000);
     var todayRecs = (energy || []).filter(function (r) { return r.ts >= startOfToday; });
-    var vzevActive = !!(members && members.length);
     var tariffs = (meta && meta.tariffs) || {};
     /* co2_g_kwh: unset → Schweizer Verbrauchermix default 128; 0 hides the stat */
     var co2Factor = (tariffs.co2_g_kwh === undefined || tariffs.co2_g_kwh === null || tariffs.co2_g_kwh === '')
       ? 128 : Number(tariffs.co2_g_kwh);
-    var kpi = insights.kpis(todayRecs, { tariffs: tariffs, vzev: vzevActive, co2: co2Factor });
+    var kpi = insights.kpis(todayRecs, { tariffs: tariffs, co2: co2Factor });
     /* Ersparnis hidden when no import/feed-in tariff is configured (Edge case) */
     var showSaving = (Number(tariffs.grid_import_chf_kwh) > 0) || (Number(tariffs.grid_feedin_chf_kwh) > 0);
     var showCo2 = co2Factor > 0;
@@ -991,7 +892,7 @@ import * as insights from '../lib/insights.js';
             <div class="ov-top">
               <section class="ov-top-flow" aria-labelledby="ov-sec-now">
                 <h2 class="ov-section" id="ov-sec-now">${t('section.now')}</h2>
-                <${FlowCard} newest=${s} vzevW=${vzevW} hasBattery=${hasBattery} hasPv=${hasPv}
+                <${FlowCard} newest=${s} hasBattery=${hasBattery} hasPv=${hasPv}
                   soc=${hasBattery ? batterySoc(prods) : null}
                   live=${live} asOf=${s ? s.ts : null} />
               </section>
@@ -1001,15 +902,14 @@ import * as insights from '../lib/insights.js';
                   showCo2=${showCo2} co2Factor=${co2Factor} />
               </section>
             </div>
-            <${CompositionCard} sample=${s} vzevW=${vzevW} records=${todayRecs}
+            <${CompositionCard} sample=${s} records=${todayRecs}
               hasBattery=${hasBattery} />
             <section class="ov-history" aria-labelledby="ov-sec-history">
               <h2 class="ov-section" id="ov-sec-history">${t('section.history')}</h2>
-              <${GridPanel} newest=${s} win=${win} vzevW=${vzevW} power=${power} />
+              <${GridPanel} newest=${s} win=${win} power=${power} />
               <${ProductionPanel} productions=${prods} history=${prodHist.current} win=${win}
                 notice=${prodNotice} onDismissNotice=${dismissProdNotice} />
               <${LoadsPanel} loads=${loads} history=${loadHist.current} win=${win} onToggle=${onToggle} />
-              <${VzevPanel} members=${members} win=${win} enabled=${vzevEnabled} />
             </section>
           <//>`}
       </div>`;

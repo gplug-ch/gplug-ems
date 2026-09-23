@@ -321,12 +321,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('overview')
   const [error, setError]         = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
-  const [theme, setTheme] = useState(() => localStorage.getItem('vzev-theme') ?? 'dark')
+  const [theme, setTheme] = useState(() => localStorage.getItem('ems-sim-theme') ?? 'dark')
 
   const toggleTheme = () => {
     setTheme(t => {
       const next = t === 'dark' ? 'light' : 'dark'
-      localStorage.setItem('vzev-theme', next)
+      localStorage.setItem('ems-sim-theme', next)
       return next
     })
   }
@@ -381,7 +381,7 @@ export default function App() {
       <header className="app-header">
         <div className="app-header__brand">
           <span className="app-header__logo">◈</span>
-          <span className="app-header__title">VZEV SIMULATOR</span>
+          <span className="app-header__title">GPLUG EMS SIMULATOR</span>
         </div>
         <div className="app-header__status">
           {error

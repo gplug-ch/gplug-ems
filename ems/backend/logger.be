@@ -32,7 +32,7 @@ logger.logMsg = def(aTrLev, aMsg)
     if _s['level'] < aTrLev
         return
     end
-    print(f"VZEV: {aMsg}")
+    print(f"EMS: {aMsg}")
 end
 
 return logger

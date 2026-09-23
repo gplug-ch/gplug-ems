@@ -4,7 +4,7 @@
 # Tasmota executes autoexec.be from EVERY *.tapp in the filesystem root. The
 # build stamps the version into the filename (ems-v1.0.9.tapp), so a plain
 # upload does NOT replace the previous release: both apps boot, the whole
-# module graph is built twice, two multicast sockets are opened, and the boot
+# module graph is built twice, both poll the integrations, and the boot
 # heap roughly doubles on an ESP32-C3 — a crash inside Tasmota's 10 s
 # fast-reboot window, i.e. a boot loop ("FRC: Some settings have been reset").
 # So: delete first, upload second.

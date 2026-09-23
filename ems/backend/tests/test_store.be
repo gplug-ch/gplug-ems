@@ -1,5 +1,5 @@
 # Tests for store.be — append-only 15-min bucket files (issue #4, spec 011
-# step 3b: no roll-ups, no set_vzev, no file is ever rewritten).
+# step 3b: no roll-ups, no file is ever rewritten).
 #
 # Run from the backend/ directory:
 #   cd tests && berry -m .. test_store.be
@@ -58,20 +58,18 @@ assert(!recs[1].contains('partial'), "complete slot must not be partial")
 print("Test 2 passed: partial (nil) slots preserved and flagged")
 
 # ---------------------------------------------------------------------------
-# Test 3: no record carries the vZEV fields any more — the browser archive
-# derives them (spec 011 FR-1122); the served shape is ts/imp/exp/pv[+partial]
+# Test 3: the served shape is exactly ts/imp/exp/pv[+partial] (spec 011
+# FR-1122)
 # ---------------------------------------------------------------------------
 store.reset()
 store.push_15m(JUN1_2026, 100, 10, 50)
 recs = store.read('15m', 1)
-assert(!recs[0].contains('vzev_in_wh') && !recs[0].contains('vzev_out_wh'),
-    "records must not carry vZEV fields")
 assert(size(recs[0]) == 4, f"expected exactly 4 keys, got {size(recs[0])}")
-print("Test 3 passed: records carry no vZEV fields")
+print("Test 3 passed: records carry only the raw fields")
 
 # ---------------------------------------------------------------------------
 # Test 4: six-field lines written before spec 011 step 3b still parse — their
-# vZEV tail is ignored, so an upgraded device keeps serving its old buckets
+# legacy tail is ignored, so an upgraded device keeps serving its old buckets
 # ---------------------------------------------------------------------------
 store.reset()
 var dayno4 = JUN1_2026 / 86400
@@ -84,14 +82,15 @@ assert(store.count('15m') == 2, f"legacy line must be counted, got {store.count(
 recs = store.read('15m', 9)
 assert(recs[0]['imp_wh'] == 100 && recs[0]['exp_wh'] == 10 && recs[0]['pv_wh'] == 50,
     "legacy 6-field line lost its Wh values")
-assert(!recs[0].contains('vzev_in_wh'), "legacy vZEV tail must not be served")
+assert(size(recs[0]) == 4, "legacy tail must not be served")
 assert(recs[1]['imp_wh'] == nil && recs[1].find('partial') == true,
     "4-field line with an empty field must read back as nil/partial")
 print("Test 4 passed: legacy 6-field lines parse, tail ignored")
 
 # ---------------------------------------------------------------------------
 # Test 5: load() removes the files this build no longer maintains — the
-# day/month seal files, stray rewrite temporaries and the pre-bucket ring
+# day/month seal files, stray rewrite temporaries, the pre-bucket ring and the
+# former community peer buckets (issue #1)
 # ---------------------------------------------------------------------------
 store.reset()
 store.push_15m(JUN1_2026, 100, 10, 50)
@@ -99,6 +98,7 @@ open(PREFIX + 'e1d', 'w').close()
 open(PREFIX + 'e1mo', 'w').close()
 open(PREFIX + 'e1d.tmp', 'w').close()
 open(PREFIX + '.e15_' + str(dayno4) + '.tmp', 'w').close()
+open(PREFIX + '.vz_peer_' + str(dayno4), 'w').close()   # former community bucket
 store.load()
 def exists(p)
     try
@@ -112,6 +112,7 @@ end
 assert(!exists(PREFIX + 'e1d'), "/e1d must be removed at load()")
 assert(!exists(PREFIX + 'e1mo'), "/e1mo must be removed at load()")
 assert(!exists(PREFIX + 'e1d.tmp'), "stray /e1d.tmp must be removed at load()")
+assert(!exists(PREFIX + '.vz_peer_' + str(dayno4)), "former peer bucket must be removed at load()")
 assert(!exists(PREFIX + '.e15_' + str(dayno4) + '.tmp'), "stray bucket .tmp must be removed")
 assert(store.count('15m') == 1, "the live bucket must survive the cleanup")
 print("Test 5 passed: obsolete roll-up/temp files removed at load()")

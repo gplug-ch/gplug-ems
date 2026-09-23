@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.4.1",
   "type": "module",
-  "description": "vZEV EMS web UI (Preact + HTM), built with Vite and served from a CDN (GitHub Pages) or self-hosted.",
+  "description": "gPlug EMS web UI (Preact + HTM), built with Vite and served from a CDN (GitHub Pages) or self-hosted.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

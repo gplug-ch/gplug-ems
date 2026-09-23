@@ -10,8 +10,9 @@
 #                  up to 2880 slots)
 # Each line: "<ts-delta>,<imp>,<exp>,<pv>\n" — the delta is relative to the
 # day's start (small numbers), an empty field means nil. Lines written before
-# spec 011 step 3b carry a trailing ",<vin>,<vout>" vZEV tail; those still
-# parse (the tail is ignored) so buckets survive the upgrade.
+# spec 011 step 3b carry a trailing ",<vin>,<vout>" tail (the former
+# community share); those still parse (the tail is ignored) so buckets
+# survive the upgrade.
 # A battery site (issue #20) appends ",<chg>,<dis>," — SEVEN fields, the last
 # one reserved and empty, so the count never collides with the legacy six.
 # (The SoC would fit there but is not recorded: its history pushed the
@@ -25,10 +26,10 @@
 # Writes are APPEND-ONLY (spec 011 NFR-1102): push_15m() appends ONE line to
 # the current day's bucket file (a few dozen bytes, LittleFS commits one
 # block). No file is ever read and rewritten — the day/month roll-ups
-# (/e1d, /e1mo) and the set_vzev() line-wise rewrite that needed the ".tmp"
-# copy-back pattern were removed in spec 011 step 3b: the browser archive
+# (/e1d, /e1mo) and the line-wise rewrite that needed the ".tmp" copy-back
+# pattern were removed in spec 011 step 3b: the browser archive
 # (ems/frontend/src/lib/archive.js) keeps the history and derives the
-# roll-ups, the vZEV share, costs and billing from its own copy.
+# roll-ups and costs from its own copy.
 
 var store = module()
 
@@ -95,7 +96,7 @@ end
 # decode one line -> [delta, imp, exp, pv, chg, dis] (the battery values
 # nil on a 4-field line; the reserved 7th field is ignored), or nil if the line is not '\n'-terminated
 # (a torn trailing append) or malformed. A 6-field line written before spec
-# 011 step 3b parses too; its vZEV tail is ignored.
+# 011 step 3b parses too; its legacy tail is ignored.
 def _parse_line(line)
     var n = size(line)
     if n < 2 || line[n - 1] != '\n'
@@ -193,6 +194,16 @@ def _remove_obsolete()
     fsx.remove(_s['prefix'] + 'e1mo.tmp')
     for d : _list_daynos()
         fsx.remove(_p15(d) + '.tmp')
+    end
+    # the former community feature (issue #1): member registry and the
+    # per-member peer buckets <prefix>.vz_<id>_<dayno>
+    fsx.remove('/vzev.json')
+    var pat = _s['stem'] + '.vz_'
+    var plen = size(pat)
+    for n : fsx.listdir(_s['dir'])
+        if size(n) > plen && n[0 .. plen - 1] == pat
+            fsx.remove(_s['prefix'] + n[size(_s['stem']) ..])
+        end
     end
 end
 

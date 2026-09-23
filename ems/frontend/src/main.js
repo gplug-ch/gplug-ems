@@ -11,9 +11,6 @@ import { Uebersicht } from './pages/uebersicht.js';
 import { Verlauf } from './pages/verlauf.js';
 import { Zaehler } from './pages/zaehler.js';
 import { Modbus } from './pages/modbus.js';
-import { Vzev } from './pages/vzev.js';
-import { VzevMember } from './pages/vzev_member.js';
-import { Abrechnung } from './pages/abrechnung.js';
 import { Einstellungen } from './pages/einstellungen.js';
 import { api } from './api.js';
 import * as archive from './lib/archive.js';
@@ -81,11 +78,11 @@ function Demo() {
           ]} />
       <//>
 
-      <${ui.Card} group="vzev" title="BarChart" subtitle="0-Achse, signierte Werte"
-        value=${fmt.chf(12.4, true)} valueColor="var(--c-vzev)">
+      <${ui.Card} group="grid" title="BarChart" subtitle="0-Achse, signierte Werte"
+        value=${fmt.chf(12.4, true)} valueColor="var(--c-export)">
         <${ui.BarChart} height=${200} yUnit="CHF" xUnit="t" yFormat=${function (v) { return fmt.chf(v, true); }}
           points=${barPts.map(function (p) {
-            return { t: p.t, y: p.y, color: p.y < 0 ? 'var(--c-import)' : 'var(--c-vzev)' };
+            return { t: p.t, y: p.y, color: p.y < 0 ? 'var(--c-import)' : 'var(--c-export)' };
           })} />
       <//>
 
@@ -132,9 +129,6 @@ function routes() {
     { path: '/verlauf', component: Verlauf },
     { path: '/zaehler', component: Zaehler },
     { path: '/modbus', component: Modbus },
-    { path: '/vzev/mitglied/:id?', component: VzevMember },
-    { path: '/vzev/abrechnung', component: Abrechnung },
-    { path: '/vzev', component: Vzev },
     { path: '/einstellungen/:tab?', component: Einstellungen },
     { path: '/demo', component: Demo }
   ];

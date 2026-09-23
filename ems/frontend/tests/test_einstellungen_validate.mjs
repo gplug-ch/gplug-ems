@@ -118,8 +118,7 @@ test('flat tariffs and full HT/NT tariffs both pass', () => {
   full.tariffs = {
     grid_import_chf_kwh: 0.26, grid_feedin_chf_kwh: 0.08,
     grid_import_ht_chf_kwh: 0.3, grid_import_nt_chf_kwh: 0.2,
-    base_fee_chf_month: 12.5, vzev_export_chf_kwh: 0.22,
-    vzev_import_chf_kwh: 0.22, co2_g_kwh: 128,
+    base_fee_chf_month: 12.5, co2_g_kwh: 128,
     ht_windows: [{ days: 'mon-fri', from: 7, to: 20 }]
   };
   assert.deepStrictEqual(validateDocument(full), []);

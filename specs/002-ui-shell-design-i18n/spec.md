@@ -33,7 +33,7 @@ components (cards, charts, badges, tooltips, tables, forms), the i18n mechanism 
 pipeline. Pages themselves are specs 003–006; this spec mounts placeholder routes.
 
 **Figma:** `https://www.figma.com/design/dZIKVwxjD12gcPUAHVuzkx/gPlug-UI` — main frames:
-Übersicht `10:310`/`10:458`, Verlauf `22:182`/`33:486`, vZEV `40:835`, Abrechnung `40:882`,
+Übersicht `10:310`/`10:458`, Verlauf `22:182`/`33:486`,
 Einstellungen `41:1508…41:1688`. If a Figma MCP/design skill is available at implementation
 time, pull exact values from these nodes; otherwise use the tokens below (sampled from the file).
 
@@ -42,7 +42,7 @@ time, pull exact values from these nodes; otherwise use the tokens below (sample
 ### UC-201: Navigate the app
 **Actor:** End user without technical background
 **Flow:** User opens `http://<device>/app`, sees the sidebar (gPlug logo, Übersicht, Verlauf,
-vZEV, Einstellungen), the active item highlighted, and the Übersicht page. Navigation is instant
+Einstellungen), the active item highlighted, and the Übersicht page. Navigation is instant
 (client-side hash routing), the URL is bookmarkable.
 
 **Acceptance Scenarios**
@@ -119,16 +119,16 @@ vZEV, Einstellungen), the active item highlighted, and the Übersicht page. Navi
   /* chart / semantic palette — contrast-checked on cream & white (FR-209) */
   --c-consumption: #D99A06; /* yellow (darker than prototype for contrast) */
   --c-production:  #2D9CDB; /* blue                            */
-  --c-vzev:        #3E7C28; /* green (vZEV flows, positive CHF) */
+  --c-export:      #3E7C28; /* green (grid export, positive CHF) */
   --c-import:      #C62D20; /* red (grid import, negative CHF; AA-darkened) */
   --c-import-fill: #F5C1BC; /* area fill import                 */
-  --c-vzev-fill:   #C4E3C9; /* area fill export/vZEV            */
+  --c-export-fill: #C4E3C9; /* area fill export                 */
   --c-active:      #2FA452; /* badge Aktiv                      */
   --c-inactive:    #6B6B77; /* badge Inaktiv                    */
   ```
   Panel groups get distinct accents (review feedback "farblich besser unterscheidbar"): each card
   carries a 4 px left border in its group color — Netzanschluss `--c-navy`, Erzeuger
-  `--c-production`, Lasten `--c-consumption`, vZEV `--c-vzev`.
+  `--c-production`, Lasten `--c-consumption`.
 - **FR-208** Typography: system font stack (`system-ui, -apple-system, "Segoe UI", Roboto,
   sans-serif` — no webfont, C-2/C-3). Scale: page title 28/700, card title 20/700, section
   label 14/600, body 14/400, secondary 12/400 `--c-text-mut`. **All page titles share the same
@@ -154,10 +154,10 @@ vZEV, Einstellungen), the active item highlighted, and the Übersicht page. Navi
   `--c-active`/`--c-inactive`/`--c-amber`), `<DataTable>` (headers with units, pagination
   footer), `<Select>`, `<TextField>`, `<Button primary|secondary|danger>` styled per Figma
   (rounded ≈ 10 px, amber primary with navy text, navy secondary with light text).
-- **FR-213** App shell: sidebar (logo, 4 nav items with icons, active state = navy-2 pill with
+- **FR-213** App shell: sidebar (logo, nav items with icons, active state = navy-2 pill with
   amber text + 3 px amber left indicator, as in Figma), `<main>` content area with `--c-bg`,
-  max-width ≈ 1450 px, 24 px gutters. Hash router with routes `#/`, `#/verlauf`, `#/vzev`,
-  `#/vzev/mitglied/:id?`, `#/vzev/abrechnung`, `#/einstellungen/:tab?` — unknown routes render
+  max-width ≈ 1450 px, 24 px gutters. Hash router with routes `#/`, `#/verlauf`,
+  `#/einstellungen/:tab?` (the former community routes were removed with issue #1) — unknown routes render
   Übersicht. Routes not yet implemented (003–006) render a placeholder card with the page title.
 - **FR-214** Data layer: `api.js` with `getPower()`, `getEnergy(res,count)`, `getMeta()`,
   `getSite()`, `getLoads()`, `getProductions()`, `getGrid()`, plus a `poll(fn, ms)` helper that

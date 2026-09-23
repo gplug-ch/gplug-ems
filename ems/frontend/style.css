@@ -13,19 +13,18 @@
   --c-line:        #E3DED0;
 
   /* Semantic energy palette (spec 010 FR-1001): the Swiss/DACH convention —
-     Produktion gelb (Sonne), Verbrauch blau, Netzbezug rot, Einspeisung/vZEV
+     Produktion gelb (Sonne), Verbrauch blau, Netzbezug rot, Einspeisung
      grün, Batterie türkis. Direction is NEVER encoded by colour alone
      (deuteranopia): position + arrow + label stay redundant. AA per FR-209
      is unchanged by the prod/cons swap — the two hex values only trade roles. */
   --c-production:  #D99A06;  /* PV / Erzeugung — Gelb/Ocker (was consumption) */
   --c-consumption: #2D9CDB;  /* Verbrauch / Haus / Lasten — Blau (was production) */
-  --c-vzev:        #3E7C28;  /* Netzeinspeisung + vZEV (lokale Energie) — Grün */
   --c-import:      #C62D20;  /* Netzbezug — Rot (darkened from #D93526 for AA 4.5:1, FR-209) */
-  --c-export:      #3E7C28;  /* Netzeinspeisung / Export — Grün (same hue as vZEV, own role) */
+  --c-export:      #3E7C28;  /* Netzeinspeisung / Export — Grün */
   --c-grid:        #6B6B77;  /* Netz node — neutral grey; the edge carries export/import colour */
   --c-battery:     #0F766E;  /* Batterie — Türkis/Petrol (AA 5.5:1 on white; no longer --c-amber) */
   --c-import-fill: #F5C1BC;
-  --c-vzev-fill:   #C4E3C9;  /* light green — the «heller» feed-in composition segment */
+  --c-export-fill: #C4E3C9;  /* light green — the «heller» feed-in composition segment */
   --c-active:      #2FA452;
   --c-inactive:    #6B6B77;
 
@@ -239,7 +238,6 @@ html, body {
 .card-grid       { border-left-color: var(--c-navy); }
 .card-production { border-left-color: var(--c-production); }
 .card-loads      { border-left-color: var(--c-consumption); }
-.card-vzev       { border-left-color: var(--c-vzev); }
 
 .card-head {
   display: flex;
@@ -471,7 +469,7 @@ html, body {
 .ta-r { text-align: right; }
 .table-empty { color: var(--c-text-mut); text-align: center; padding: 28px 0; }
 
-.val-pos { color: var(--c-vzev); font-weight: 600; }
+.val-pos { color: var(--c-export); font-weight: 600; }
 .val-neg { color: var(--c-import); font-weight: 600; }
 
 .table-footer {
@@ -583,7 +581,7 @@ html, body {
 .ov-stat-label { font-size: 13px; color: var(--c-text-mut); }
 .ov-stat-value { font-size: 16px; font-weight: 700; margin-left: 2px; }
 
-/* sub-chart grid (Erzeuger / Lasten / vZEV): 2-up desktop, stacked mobile */
+/* sub-chart grid (Erzeuger / Lasten): 2-up desktop, stacked mobile */
 .ov-subgrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -819,181 +817,15 @@ html, body {
 .wifi-scan-meta { color: var(--c-text-mut); font-size: 12px; }
 .wifi-scan-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
-/* ================= Abrechnung (spec 005) ================= */
-
-.billing-grid {
-  display: grid;
-  /* min(100%, 320px) so a single statement never forces the page wider than a
-     ~300px phone (bare 320px min overflowed the body below that width) */
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  gap: 16px;
-}
-.billing-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px 32px;
-  margin: 4px 0 14px;
-}
-.billing-metric { display: flex; flex-direction: column; gap: 2px; }
-.billing-metric-label { color: var(--c-text-mut); font-size: 13px; }
-.billing-metric-value { font-size: 22px; font-weight: 700; }
-.billing-card-note { color: var(--c-text-mut); font-size: 13px; margin: 0 0 10px; }
-.billing-note-card { margin-top: 16px; }
-.billing-note { color: var(--c-text-mut); margin: 0; font-size: 13px; line-height: 1.5; }
-
-/* ================= vZEV community graph (spec 005 FR-510) ================= */
-
-.vz-graph-wrap { display: block; }
-.vz-list-wrap { display: none; }
-
-.vz-graph {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 0;
-}
-.vz-ring {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 20px;
-  width: 100%;
-  margin-bottom: 10px;
-}
-.vz-ring-empty { width: 100%; text-align: center; }
-
-.vz-node { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.vz-node-own { margin: 6px 0 2px; }
-
-/* member card: house icon, amber outline, name pill */
-.vz-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 148px;
-  padding: 16px 14px 14px;
-  background: var(--c-surface);
-  border: 2px solid var(--c-amber);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-.vz-card-own { border-color: var(--c-navy); }
-.vz-card-producer { border-color: var(--c-vzev); }
-
-.vz-house { width: 34px; height: 34px; color: var(--c-navy); }
-.vz-card-producer .vz-house { color: var(--c-vzev); }
-.vz-house-wrap { display: inline-flex; }
-
-.vz-name {
-  font-weight: 700;
-  text-align: center;
-  padding: 3px 12px;
-  border-radius: 999px;
-  background: #FCF3DC;
-  color: var(--c-navy);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.vz-card-own .vz-name { background: var(--c-navy); color: #F7F3E5; }
-.vz-type { font-size: 11px; color: var(--c-text-mut); }
-.vz-ownbadge {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.4px;
-  text-transform: uppercase; color: var(--c-navy);
-}
-
-.vz-edit {
-  position: absolute;
-  top: 6px; right: 6px;
-  width: 26px; height: 26px;
-  border: 0; border-radius: 8px;
-  background: none; cursor: pointer;
-  color: var(--c-text-mut);
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.vz-edit svg { width: 16px; height: 16px; }
-.vz-edit:hover { background: #FBF9F2; color: var(--c-navy); }
-
-.vz-remove {
-  background: none; border: 0; cursor: pointer;
-  color: var(--c-import); font: inherit; font-size: 12px; padding: 0;
-}
-.vz-remove:hover { text-decoration: underline; }
-
-/* live flow label under a peer */
-.vz-flow { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
-.vz-flow-vzev { color: var(--c-vzev); }
-.vz-flow-grid { color: var(--c-navy); }
-.vz-flow-arrow { font-size: 15px; line-height: 1; }
-
 /* connector line to the «Netz» node */
-.vz-arrow-grid { display: flex; justify-content: center; height: 26px; }
-.vz-arrow-line { width: 2px; background: var(--c-navy); border-radius: 2px; }
 
 /* «Netz» node in navy */
-.vz-netnode {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 12px 20px;
-  background: var(--c-navy); color: #F7F3E5;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-.vz-netnode-row { flex-direction: row; gap: 10px; }
-.vz-grid-ico { width: 28px; height: 28px; color: var(--c-amber); }
-.vz-grid-icowrap { display: inline-flex; }
-.vz-net-label { font-weight: 700; letter-spacing: 0.3px; }
 
 /* discovery list */
-.vz-discovery-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-.vz-discovery-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.vz-discovery-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--c-line); border-radius: var(--radius-s);
-  flex-wrap: wrap;
-}
-.vz-disc-name { font-weight: 700; }
-.vz-disc-meta { color: var(--c-text-mut); font-size: 12px; flex: 1 1 auto; }
-.vz-plus { width: 14px; height: 14px; vertical-align: -2px; }
 
 /* mobile: direction chips */
-.vz-list { display: flex; flex-direction: column; gap: 12px; }
-.vz-list-item {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  background: var(--c-surface);
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  box-shadow: var(--shadow);
-}
-.vz-list-item .vz-card { border: 0; box-shadow: none; width: auto; flex-direction: row; padding: 0; gap: 12px; }
-.vz-list-item .vz-card .vz-house { width: 26px; height: 26px; }
-.vz-list-item .vz-edit { position: static; }
-.vz-chip {
-  display: inline-flex; flex-direction: column; gap: 1px;
-  margin-left: auto; padding: 6px 12px;
-  border-radius: 999px; font-size: 12px; font-weight: 600;
-}
-.vz-chip-dir { font-size: 10px; font-weight: 500; opacity: 0.8; }
-.vz-chip-vzev { background: var(--c-vzev-fill); color: var(--c-vzev); }
-.vz-chip-grid { background: #E7E7EE; color: var(--c-navy); }
 
 /* member form */
-.vz-form { display: flex; flex-direction: column; gap: 16px; max-width: 420px; }
-.vz-form .field { width: 100%; }
-.vz-form-err {
-  margin: 0; color: var(--c-import); font-size: 13px; font-weight: 600;
-}
-.vz-form-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
-
-@media (max-width: 767px) {
-  .vz-graph-wrap { display: none; }
-  .vz-list-wrap { display: block; }
-}
 
 /* ---- Verlauf history page (spec 004) ---- */
 .verlauf-actions {
@@ -1112,7 +944,7 @@ html, body {
 .summary-label { font-size: 12px; color: var(--c-text-mut); }
 .summary-value { font-size: 20px; font-weight: 700; }
 .trend-up { color: var(--c-import); }
-.trend-down { color: var(--c-vzev); }
+.trend-down { color: var(--c-export); }
 
 /* ================= Energiefluss & Kennzahlen (spec 008) ================= */
 /* spec 010: words-first status headline under the card title (UC-1001) */
@@ -1160,8 +992,7 @@ html, body {
 /* ---- Stromfluss hub (Haus is the hub, insights.hubFlows) ----
    One markup, two layouts chosen by the CARD width (container query), not the
    viewport: a vertical chain in a narrow card (phone), a horizontal chain from
-   520px. Tiers: sources (PV, Batterie) → links → Haus → links → grid (Netz,
-   vZEV). Nodes in a tier and their links share the same grid track, so each
+   520px. Tiers: sources (PV, Batterie) → links → Haus → links → grid (Netz). Nodes in a tier and their links share the same grid track, so each
    edge lines up with its node. */
 .hub-wrap { container-type: inline-size; }
 .hub { display: flex; flex-direction: column; align-items: stretch; }
@@ -1570,12 +1401,11 @@ html, body {
   .btn-small    { min-height: 40px; }
   .icon-btn     { width: 42px; height: 42px; }
   .table-navbtn { width: 40px; height: 40px; }
-  .vz-edit      { width: 34px; height: 34px; }
+  
   .pill         { min-height: 42px; }
   .seg-btn      { padding: 10px 16px; }
   .select-small { min-height: 38px; }
-  .vz-explain-btn,
-  .explain-more { min-height: 40px; }
+  
   /* expand the info-icon's tap area without nudging its neighbours */
   .tooltip-icon { position: relative; }
   .tooltip-icon::before { content: ''; position: absolute; inset: -13px; }
@@ -1656,7 +1486,7 @@ html, body {
 .meter-raw-unit, .meter-raw-label { color: var(--c-text-mut); }
 .meter-raw-sep td { font-weight: 700; color: var(--c-text-mut); padding-top: 14px; border-bottom: 2px solid var(--c-line); }
 
-/* ================= vZEV Betrieb — Tarife, Datenqualität, Abrechnung (spec 009) ================= */
+/* ================= Settings validation (spec 009) ================= */
 
 /* settings: validation hint / cap ok/warn lines + HT-window rows */
 .settings-warn { grid-column: 1 / -1; color: #9a5b00; background: #FBF3E2; border: 1px solid var(--c-amber);
@@ -1666,70 +1496,13 @@ html, body {
 .settings-warn-list code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
 .ht-window-row { align-items: flex-end; }
 
-/* vZEV page: no-data badge, info box, drill-down trigger */
-.vz-nodata {
-  display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 8px;
-  font-size: 11px; font-weight: 700; background: #FBE9E4; color: #9a3412;
-}
-.vz-info { border-left: 4px solid var(--c-amber); }
-.vz-info-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.vz-info-close, .explain-close {
-  border: none; background: none; font-size: 22px; line-height: 1; cursor: pointer;
-  color: var(--c-text-mut); padding: 0 4px;
-}
-.vz-info-body { font-size: 14px; color: var(--c-text); margin: 8px 0 12px; }
-.vz-explain-btn {
-  margin-top: 6px; border: 1px solid var(--c-line); background: var(--c-surface);
-  border-radius: 8px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer;
-  color: var(--c-text);
-}
-.vz-explain-btn:hover { background: #FBF9F2; }
-.vz-form-hint { font-size: 12px; color: var(--c-text-mut); margin: 2px 0 8px; }
-
-/* slot drill-down (shared explain component) */
-.explain-panel { margin-top: 12px; border-top: 1px solid var(--c-line); padding-top: 12px; }
-.explain-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.explain-title { font-size: 15px; font-weight: 700; margin: 0; }
-.explain-subtitle { font-size: 12px; color: var(--c-text-mut); margin: 2px 0 8px; }
-.explain-list { list-style: none; margin: 0; padding: 0; }
-.explain-slot { font-size: 13px; padding: 6px 0; border-bottom: 1px solid #EFEBDE; }
-.explain-more {
-  margin-top: 8px; border: 1px solid var(--c-line); background: var(--c-surface);
-  border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer;
-}
-
-/* billing: provisorisch marker, quality line, statement detail */
-.billing-provisional {
-  display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px;
-  font-weight: 700; background: #FBF3E2; color: #9a5b00;
-}
-.billing-header-card .billing-hdr-line { font-size: 13.5px; margin: 4px 0; }
-.billing-hdr-key { font-weight: 700; color: var(--c-text-mut); }
-.billing-quality { border-left: 4px solid var(--c-amber); }
-.billing-quality-head { display: flex; align-items: center; gap: 10px; }
-.billing-quality-line { font-size: 13px; margin: 4px 0; }
-.billing-quality-ok { color: #2f6b3a; }
-.billing-card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.stmt { margin-top: 12px; border-top: 1px solid var(--c-line); padding-top: 10px; }
-.stmt-line { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; font-size: 13.5px; }
-.stmt-key { color: var(--c-text-mut); display: inline-flex; align-items: center; gap: 5px; }
-.stmt-val { font-weight: 600; text-align: right; }
-.stmt-residual { font-size: 12.5px; color: var(--c-text-mut); font-style: italic; margin: 8px 0; }
-.billing-actions { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
-
 /* ================= Print view (spec 009 FR-907) ================= */
-/* PDF via the browser print dialog, no libraries. One member statement per
-   page; hide chrome and interactive controls. */
+/* PDF via the browser print dialog, no libraries; hide chrome and
+   interactive controls. */
 @media print {
-  .app-nav, .app-header, .toast-host, .no-print,
-  .billing-actions, .billing-card-actions, .vz-explain-btn,
-  .explain-close, .vz-info-close, .pill-bar { display: none !important; }
+  .app-nav, .app-header, .toast-host, .no-print, .pill-bar { display: none !important; }
   body, .app-main { background: #fff !important; }
-  .billing-grid { display: block !important; }
-  .billing-grid > * { break-inside: avoid; page-break-inside: avoid; }
-  .billing-grid > *:not(:first-child) { break-before: page; page-break-before: always; }
-  .card, .billing-header-card, .billing-quality { box-shadow: none !important; border: 1px solid #ccc !important; }
-  .stmt { display: block !important; } /* always show detail when printing */
+  .card { box-shadow: none !important; border: 1px solid #ccc !important; }
 }
 
 /* ================= Übersicht layout (issue #19) =================
