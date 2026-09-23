@@ -159,7 +159,7 @@ literal on purpose — the Swiss colour convention must stay unmistakable.
 - **Surface** (#FFFFFF): cards, sub-panels, fields, floating chrome. White means "this holds
   data."
 - **Navy** (#1A1A38): body text *and* primary structure — the fixed sidebar, primary
-  secondary-button fill, the «Netz» node, chart axes, tooltip/toast backgrounds.
+  secondary-button fill, the Netzanschluss card edge, chart axes, tooltip/toast backgrounds.
 - **Navy-2** (#35355A): the lighter navy for the active nav-item fill and the `Niedertarif` tag.
 - **Text Muted** (#6B6B77): secondary text, labels, captions, muted table rows. Deliberately
   darkened from the prototype's #8A8A93 to clear WCAG AA 4.5:1 on white (FR-209).
@@ -175,6 +175,8 @@ These map 1:1 to concepts and follow the Swiss/DACH convention. Treat them as re
 - **Battery** (#0F766E): Batterie — Türkis/Petrol (AA 5.5:1 on white).
 - **Import Fill** (#F5C1BC) / **Export Fill** (#C4E3C9): the pale tints used for the lighter
   segment of composition bars and chips.
+- **Grid** (#6B6B77, `--c-grid`): the neutral grey «Netz» node in the flow view; the grid edge
+  itself takes Import red / Export green by direction.
 - **Active** (#2FA452) / **Inactive** (#6B6B77): load-state badge fills.
 
 ### Named Rules
@@ -324,11 +326,15 @@ exact padding, calm colour, no unnecessary motion. Transitions are short (0.15s)
   when new numeric surfaces are added.
 
 ### Energy Flow Diagram (signature)
-- Hand-rolled SVG (no chart library) with its own node/edge language.
-- Live edges animate a dash drift *in the flow direction* (`flow-dash`, 0.9s); unknown edges use
-  a sparse dash; the battery node slides between its source/sink slot rather than jumping.
-- A **words-first status headline** sits above the diagram, and every edge label is redundant
-  with position + arrow. Under `prefers-reduced-motion` the drift collapses to a static dash.
+- Hand-built in HTML + CSS grid (not SVG, no chart library; only the node icons are inline SVG)
+  with its own node/edge language: PV and Batterie before Haus, Netz after it; the layout
+  switches between a vertical chain and a horizontal one (container ≥ 520px).
+- Live edges animate dots drifting *in the flow direction* (`hub-flow-v` / `hub-flow-h`, 0.9s);
+  an edge's arrow flips with its direction (battery charging, grid import); a real 0 W edge is
+  dimmed, an unknown one is grey dashed with «–».
+- A **words-first status headline** (`.flow-status`) sits above the diagram, and every edge label
+  is redundant with position + arrow. Under `prefers-reduced-motion` the global reduced-motion
+  rule stops the drift.
 
 ### KPI Tile & Gauge
 - Horizontal tile (Surface, Line border, 10px), a 58px circular **SVG gauge** left, a heavy

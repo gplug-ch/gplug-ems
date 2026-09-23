@@ -30,17 +30,20 @@ The EMS runs a **priority-based threshold algorithm** every second on the device
 (`ems/backend/ems.be`):
 
 ```
-Surplus = PV_Power − Household_Consumption
+Surplus = sum of currentPower of all non-battery productions (PV)
+          (a battery is only observed: discharge never activates a load)
 
-For each load in priority order:
-  if load is inactive AND Surplus ≥ load.min_power AND load is not blocked:
-    → activate load
-    → reduce Surplus by the target power of the load
+Consider only loads in state waiting or active, sorted by priority (ascending).
+For each such load:
+  if load is waiting AND Surplus ≥ load.currentPower (its rated power):
+    → activate load, reduce Surplus by load.currentPower
+  if load is active:
+    if Surplus ≥ load.currentPower − 200 W  → keep running
+    else if minimum runtime (minimalDuration) not reached → keep running
+    else → back to waiting
+    (a load kept running still reduces Surplus by its power)
 
-  if load is running AND Surplus drops below a lower threshold (e.g. 200 W):
-    → check if minimum runtime has been reached
-       yes → deactivate load
-       no  → keep running until minimum runtime is reached
+Loads in state inactive are never touched; the user moves a load to waiting.
 ```
 
 ## PV producer

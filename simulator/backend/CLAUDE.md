@@ -4,8 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+From the repo root: `make sim-run` (= `./gradlew bootRun`) and `make sim-test` (= `./gradlew test`).
+In this directory:
+
 ```bash
-./gradlew bootRun        # Run the application
+./gradlew bootRun        # Run the application (http://localhost:9090/simulator)
 ./gradlew build          # Build and run all tests
 ./gradlew test           # Run tests only
 ./gradlew bootJar        # Build executable JAR
@@ -14,31 +17,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Run a single test class:
 ```bash
-./gradlew test --tests "ch.gplug.simulator.SimulatorApplicationTests"
+./gradlew test --tests "ch.gplug.simulator.production.ProductionServiceTest"
 ```
+
+Tests: `SimulatorApplicationTests` (context), `ModularityTests` (Spring Modulith boundaries),
+`production/ProductionServiceTest` (battery SoC model).
 
 ## Architecture
 
-Spring Boot 4 / Kotlin / Java 21 backend that simulates energy loads and photovoltaic systems for the gPlug EMS project. It is the backend counterpart of a React frontend and exposes a REST API consumed by both the frontend simulator UI and by EMS (Energy Management System) logic.
+Spring Boot 4.0 / Kotlin 2.2 / Java 21 backend (Gradle 9 wrapper) that simulates sites with
+loads, productions (PV, battery) and a grid meter for the gPlug EMS project. It serves the
+simulator UI (`../frontend`, deployed as static files into `src/main/resources/static/`) and
+exposes a REST API that an EMS device's `simulator` integration polls.
 
 **Package root:** `ch.gplug.simulator`
 
 **Spring Modulith modules** (each a package under `ch.gplug.simulator`; public API at the
-package root, wiring in `*/internal`; boundaries verified by `ModularityTests`):
+package root, controllers/wiring in `*/internal`; boundaries verified by `ModularityTests`):
 - **site** — site registry + `SimulatorAutoConfig` (central `@Bean` wiring) + YAML config (`application.yaml`, prop prefix `simulator.sites`)
-- **load** — dryer/wallbox/heat pump/boiler with a `inactive → waiting → active` state machine
-- **production** — PV + battery power sources
-- **grid** — `GridMeter` import/output power per site
+- **load** — dryer/wallbox/heat pump/boiler with an `inactive → waiting → active` state machine;
+  an active load falls back to `inactive` after its configured `duration`
+- **production** — PV + battery power sources; a battery takes signed power (+ discharge,
+  − charge) and integrates its SoC on read (`capacityWh`, `initialSoc`, clamped at 0/100 %)
+- **grid** — `GridMeter` import/output power per site (set manually via the API/UI)
 - **meter** — synthesises a realistic Tasmota Smart-Meter-Interface descriptor from the site's
-  live grid state for the EMS «Zähler» page (spec 007). `GET /sites/{siteId}/meter[?variant=full|basis|minimal]`
-  returns the raw `z`-shaped object; energy registers are integrated on read. `full` = extended
-  CIP list, `basis` = 15-element Basisliste (no per-phase power), `minimal` = Pi/Po only.
+  live grid state for the EMS «Zähler» page (spec 007). Returns the raw `z`-shaped object;
+  energy registers are integrated on read. `full` (default) = extended CIP list,
+  `basis` = 15-element Basisliste (no per-phase power), `minimal` = Pi/Po only.
 
-REST endpoints live under context-path `/simulator`, e.g. `GET /simulator/sites/{id}/meter`.
+**REST endpoints** (context-path `/simulator`, port 9090 — see `application.yaml`):
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/sites`, `/sites/{siteId}` | Sites incl. loads, productions, grid |
+| GET | `/sites/{siteId}/loads[/{loadId}]` | Loads |
+| PUT | `/sites/{siteId}/loads/{loadId}/state` | Body `{"state":"WAITING"\|"ACTIVE"\|"INACTIVE"}` |
+| GET | `/sites/{siteId}/productions[/{productionId}]` | Productions |
+| PUT | `/sites/{siteId}/productions/{productionId}/power` | Body `{"power":<W>}` |
+| GET | `/sites/{siteId}/grid[/input\|/output]` | Grid meters |
+| PUT | `/sites/{siteId}/grid/{meterId}/power` | Body `{"power":<W>}` (≥ 0) |
+| GET | `/sites/{siteId}/meter[?variant=full\|basis\|minimal]` | Synthetic smart-meter descriptor |
+
+OpenAPI UI: `http://localhost:9090/simulator/swagger-ui.html` (springdoc).
 
 **Tech stack:**
-- Spring Web MVC (servlet-based, not reactive), Spring Modulith
-- Jackson + Kotlin module for JSON
+- Spring Web MVC (servlet-based, not reactive), Spring Modulith, Bean Validation
+- Jackson 3 (`tools.jackson`) + Kotlin module for JSON
+- springdoc-openapi (Swagger UI)
 - Spring Boot DevTools (hot-reload in dev)
-- Docker Compose integration (`compose.yaml`). NOTE: `bootRun` tries to reach the Docker daemon
-  at boot; without Docker running, start with `--args='--spring.docker.compose.enabled=false'`.
+- Docker: `Dockerfile` + `compose.yaml` (service `simulator`, port 9090). The Docker Compose
+  integration is on the dev classpath with `lifecycle-management: none`; if `bootRun` fails
+  because no Docker daemon is reachable, start with `--args='--spring.docker.compose.enabled=false'`.

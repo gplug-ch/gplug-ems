@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development server
 
 ```sh
-npm install   # once
+npm ci        # once (package-lock.json; yarn.lock is stale — don't use yarn)
 npm run dev   # Vite dev server (HMR) on http://localhost:5173
 ```
 
@@ -29,8 +29,8 @@ http://localhost:5173/?host=<device-ip>
 ```
 
 The `?host=` override in `src/api.js` still exists and bypasses the proxy — it
-only works against a backend that sends CORS headers itself (the simulator, or a
-Tasmota build with `USE_CORS` + the `Cors` command set).
+only works against a backend that sends CORS headers itself (a Tasmota build
+with `USE_CORS` + the `Cors` command set; the Spring Boot simulator sends none).
 
 ## Architecture
 
@@ -51,8 +51,8 @@ npm-managed dependencies. See `README.md` for the full build/deploy flow.
 **Build modes** (`ASSET_BASE`, in `vite.config.js`): `cdn` (default) serves the
 bundle *and* `lang.json` from a CDN — device ships only `index.html` (the ~23 KB
 dictionary is not packed: if the CDN is down the JS bundle is gone too, so an
-on-device copy saves nothing); `self` packs hashed assets **and** `lang.json`
-into the `.tapp` for offline/restricted networks; `dev` makes the
+on-device copy saves nothing); `<url>` does the same from an internal mirror;
+`dev` makes the
 shell load from a running `npm run dev` server (HMR) for developing the UI
 against a real device — the URL defaults to this machine's auto-detected LAN IP
 (override with `DEV_SERVER_URL`); the dev server binds to all interfaces on 5173.
@@ -98,19 +98,22 @@ nothing rather than to a stale line.
 
 | Endpoint | Purpose |
 |----------|---------|
+| `GET /site` | Site metadata `{id, name, location, description}`; the archive keys IndexedDB by its `id` |
 | `GET /loads` | All loads array |
 | `GET /loads?id=<id>&action=transition&to=<state>` | Transition state (`inactive`/`waiting`/`active`) |
 | `GET /productions` | All productions array |
-| `GET /api/energy?res=15m&count=&from=&to=` | Raw 15-min records (`ts`, `imp_wh`, `exp_wh`, `pv_wh`, `partial?`); `res` must be `15m` (anything else → 400, spec 011 FR-1122); with `from` it pages forward from the oldest matching slot (FR-1103) |
+| `GET /api/power` | `{now, samples}` — the device's 10 s meter sample ring (Übersicht charts) |
+| `GET /api/energy?res=15m&count=&from=&to=` | Raw 15-min records (`ts`, `imp_wh`, `exp_wh`, `pv_wh`, `partial?`; battery sites add `bat_chg_wh`/`bat_dis_wh`); `count` defaults to 96; `res` must be `15m` (anything else → 400, spec 011 FR-1122); with `from` it pages forward from the oldest matching slot (FR-1103) |
 | `GET /api/meta` | `{time, tariffs}` (spec 011 step 1 dropped `version`/`language`) |
 | `GET /api/meter` | Raw smart-meter descriptor `{now, values}` (spec 007); browser interprets it via `lib/metercat.js` |
 | `GET /api/modbus` | Standalone Modbus registers (site.json `modbusRegisters`, configured in Einstellungen → Modbus) — array of items (config fields + live `currentPower`), streamed like `/loads`/`/productions`. Rendered as a raw table in `pages/modbus.js`, same table styling as the Zähler «Rohdaten» section; nav entry gated on the list being non-empty (mirrors the `meter` gate) |
-| `GET /fs?name=<file>` | Serve a file from the Tasmota filesystem |
+| `GET /api/config` / `POST /api/config` | Read / replace `site.json` (Einstellungen; field validation is browser-side, the device only rejects non-objects (400) or an unloadable doc (500 + rollback)) |
+| `GET /fs?name=<file>` | Serve a file from the Tasmota filesystem (`/app` redirects to `/fs?name=index.html`) |
+| `GET /cm?cmnd=<cmd>` | Tasmota command API (Einstellungen «gPlug» tab: restart, WLAN) |
 
-**Load object fields:** `id`, `name`, `state`, `power` (rated watts), `priority` (lower = higher priority), optional `url`.
-**Production object fields:** `id`, `name`, `currentPower` (or `current_power`), optional `url`.
+**Load object fields:** the site.json config (`id`, `friendlyName`, `loadType`, `priority` (lower = higher priority), `integration`, `url`, `duration`, `minimalDuration`, …) plus live `state` and `currentPower` (W).
+**Production object fields:** the site.json config (`id`, `friendlyName`, `productionType` `PHOTOVOLTAIC`/`BATTERY`, `integration`, …) plus live `currentPower` (W; the UI also accepts `current_power`); a battery adds `soc`, a gplug item with `stale_after` adds `stale`/`lastUpdate`, one with `energy_field` adds `energyCounter`.
 
 **Build note:** `make` (repo root) runs the Vite build and packs the shell
-into the `.tapp`. In CDN mode the shell references `https://<CDN_BASE_URL>/<version>/…`;
-in `ASSET_BASE=self` mode (`make build-self`) it references `/fs?name=<hashed-file>` and the assets
-are packed on-device. Don't hand-edit `index.html` asset refs — Vite owns them.
+into the `.tapp`. The shell references `<CDN_BASE_URL>/<version>/…`; there is
+no self-host mode (`ASSET_BASE=self` was removed and now fails the build). Don't hand-edit `index.html` asset refs — Vite owns them.

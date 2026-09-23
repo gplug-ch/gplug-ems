@@ -3,11 +3,10 @@
   "private": true,
   "version": "0.4.1",
   "type": "module",
-  "description": "gPlug EMS web UI (Preact + HTM), built with Vite and served from a CDN (GitHub Pages) or self-hosted.",
+  "description": "gPlug EMS web UI (Preact + HTM), built with Vite and served from a CDN (GitHub Pages).",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:self": "ASSET_BASE=self vite build",
     "build:dev": "ASSET_BASE=dev vite build",
     "preview": "vite preview",
     "deploy": "scripts/deploy-gh-pages.sh",

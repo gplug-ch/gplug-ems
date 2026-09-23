@@ -27,7 +27,6 @@ All `make` targets run from the repo root (single root `Makefile`; `make help` l
 | Component | Command | Purpose |
 |-----------|---------|---------|
 | EMS | `make` / `make build` | Build `build/ems-v<VERSION>.tapp` (CDN shell; `LANG=en` for English) |
-| EMS | `make build-self` | Self-hosted `.tapp` (JS/CSS + `lang.json` packed in) |
 | EMS | `make build-dev` | `.tapp` whose shell loads the UI from `make dev` (HMR on a device) |
 | EMS | `make test` | Berry tests + frontend tests (`test-backend`, `test-frontend`) |
 | EMS backend | `cd ems/backend/tests && berry -m .. test_ems_allocation.be` | Single test |
@@ -44,7 +43,7 @@ All `make` targets run from the repo root (single root `Makefile`; `make help` l
 
 ### Two runtimes, one domain model
 
-**EMS (production):** Berry scripts packaged as a `.tapp` deployed on Tasmota ESP32 firmware. The device ships only a tiny `index.html` shell; the Vite-built JS/CSS bundle and the `lang.json` dictionary are served from a CDN (GitHub Pages, gplug-ch/gplug-cdn), versioned by `VERSION.txt`. A self-host mode (`make build-self`) packs the assets back into the `.tapp` for offline/restricted networks. Each device is standalone: it runs the allocation algorithm for its own site only; there is no inter-device communication.
+**EMS (production):** Berry scripts packaged as a `.tapp` deployed on Tasmota ESP32 firmware. The device ships only a tiny `index.html` shell; the Vite-built JS/CSS bundle and the `lang.json` dictionary are served from a CDN (GitHub Pages, gplug-ch/gplug-cdn), versioned by `VERSION.txt`. There is no self-host mode: the UI always loads from the CDN, so the browser needs internet access. Each device is standalone: it runs the allocation algorithm for its own site only; there is no inter-device communication.
 
 **Simulator:** Spring Boot backend + React frontend running on a PC/server. Mirrors the EMS domain model for testing and demonstration without physical devices.
 
@@ -75,23 +74,25 @@ autoexec.be → main.be
                 └── configservice.be (GET/POST /api/config, lazily loaded)
 ```
 
+Helpers: `drivershim.be` (Tasmota driver registration), `fsx.be` (filesystem primitives, CLI vs. device), `integrations/nethost.be` (per-host outbound-HTTP backoff). `main.be` imports only the integrations `site.json` actually configures. In the `.tapp` all files are flattened into its root.
+
 ### Integrations
 
-The EMS backend supports four device integrations configured per-load in `site.json`:
+The EMS backend supports five device integrations, configured per item (load, production, grid, `meter`, `modbusRegisters`) in `site.json`. Only `shelly` and `simulator` can switch a load; the others are read-only:
 
 | Integration | What it does |
 |-------------|-------------|
-| `homeassistant` | Reads sensors / controls via HA HTTP API (OAuth token in `/private/`). A non-numeric state (`unavailable`/`unknown`) reports no value, never a fake 0. Reference instance with a Loxone battery: `192.168.0.138:8123` (`sensor.speicher_leistung` kW signed, `sensor.speicher_ladestand` %, see `examples/site-ha.json`) |
-| `shelly` | Controls Shelly relay devices; reads on/off status |
+| `homeassistant` | Reads sensors via the HA REST API (`"url"` = `…/api/states/<entity>`, long-lived access token in the item's `"token"`, `"dimension":"kW"` → W); read-only. A non-numeric state (`unavailable`/`unknown`) reports no value, never a fake 0. Reference instance with a Loxone battery: `192.168.0.138:8123` (`sensor.speicher_leistung` kW signed, `sensor.speicher_ladestand` %, see `examples/site-ha.json`) |
+| `shelly` | Controls Shelly (Gen1) relay devices, loads only; `"url"` is an object `{"on", "off", "status"}` of relay URLs; reads on/off status |
 | `gplug` | Reads a `field` from the local `tasmota.read_sensors()` JSON — the smart-meter object `z` by default, or any other top-level object via `"sensor"` (e.g. `"sensor":"SMA","field":"P_AC"` for an attached SMA inverter, issue #10). Optional SunSpec dynamic scale factor (issue #12): `"scale_field":"Psf"` names the exponent register, `"scale_base"` the exponent the value is already scaled for (default 0 = raw register); the value becomes `value * 10^(sf - base)`. Opt-in only — nothing is derived from the field name. Optional `"max_power"` (W, issue #13) caps the scaled value: a read beyond it (e.g. the SunSpec N/A sentinel 0x8000 a script pre-scales to 327.68 kW at night) is dropped like a missing field. Optional stale detection (issue #15): `"stale_after"` (s) enables it — a Modbus script keeps publishing the last value after sunset, so freshness is inferred from change (the `"energy_field"` counter moving, else the power value changing; a 0 is always fresh). Past the limit the item reports `currentPower` 0, `stale: true` and `lastUpdate` (utc of the last fresh value), shown greyed in Übersicht. The same `"energy_field"` also reports the counter as `energyCounter` (Wh; unit `"energy_dimension"` Wh/kWh, default following `dimension`; own scale factor `"energy_scale_field"`/`"energy_scale_base"`), and `meter.be` then seals a PV production's 15-min energy from the counter difference instead of the power integral (issue #14) — falling back to the integral on the first/partial slot, a reset (negative difference), a jump beyond `max_power`, or a slot without readings. A battery reads its SoC from `"soc_field"` (+ `"soc_scale_field"`/`"soc_scale_base"`, e.g. SunSpec `ChaState`/`ChaState_SF`, issue #20) |
-| `simulator` | REST calls to the Spring Boot simulator backend |
-| `modbustcp` | Own Modbus TCP master (`integrations/modbustcp.be`) — reads ONE register (or register pair) directly over the LAN, no Tasmota-side script needed, unlike `gplug`'s local-sensor read. Config: `"url"` (`ip:port`), `"unit"` (slave id, default 1), `"function"` (3=Holding/4=Input, default 3), `"register"` (wire address, no 40001 offset math), `"dtype"` (`float32`/`int16`/`uint16`/`int32`/`uint32`), `"swap_words"` (CDAB word order), `"scale"` (static multiplier — for a fixed-point register with no SunSpec-style dynamic exponent register to read, unlike `gplug`'s `scale_field`). Produces `currentPower` only (no soc/energy yet). Also usable standalone via top-level `"modbusRegisters"` (below) for values that don't fit loads/productions/grid, e.g. a submeter |
+| `simulator` | REST calls to the Spring Boot simulator backend (`"url"` of the simulated item; always watts) |
+| `modbustcp` | Own Modbus TCP master (`integrations/modbustcp.be`) — reads ONE register (or register pair) directly over the LAN, no Tasmota-side script needed, unlike `gplug`'s local-sensor read. Config: `"url"` (`ip:port`), `"unit"` (slave id, default 1), `"function"` (3=Holding/4=Input, default 3), `"register"` (wire address, no 40001 offset math), `"dtype"` (`float32`/`int16`/`uint16`/`int32`/`uint32`), `"swap_words"` (CDAB word order), `"scale"` (static multiplier — for a fixed-point register with no SunSpec-style dynamic exponent register to read, unlike `gplug`'s `scale_field`), `"dimension":"kW"` (→ W). Read-only. Produces `currentPower` only (no soc/energy yet). Also usable standalone via top-level `"modbusRegisters"` (below) for values that don't fit loads/productions/grid, e.g. a submeter (optional `"unitLabel"` for display) |
 
-### HTTP API (EMS/SITE, GET-only)
+### HTTP API (EMS/SITE)
 
-All endpoints are HTTP GET. State transitions and power setpoints are sent as query parameters. The frontend polls `/loads` and `/productions` every 2 seconds.
+All endpoints are HTTP GET, except `POST /api/config`. State transitions are sent as query parameters. The Übersicht page polls `/api/power`, `/loads` and `/productions` every 10 seconds.
 
-Key endpoints: `GET /loads`, `GET /loads?id=<id>&action=transition&to=<state>`, `GET /productions`, `GET /site`, `GET /api/meta` (`{time, tariffs}`), `GET /api/meter` (raw smart-meter passthrough, spec 007), `GET /api/modbus` (standalone Modbus registers — site.json `"modbusRegisters"`, array of config + live `currentPower`, streamed like `/loads`/`/productions`; not a foreign-descriptor passthrough like `/api/meter` since the device already owns the labels). Spec 011 step 1 deleted the dead surface: `/grid`, `/reload`, `action=set-power`, the bare `?id=` item reads and `meta.version`/`meta.language`. Spec 011 step 2 deleted the device-side config validator: `POST /api/config` now only rejects a body that is not a JSON object (400) or a document `site.load_config()` cannot load (500 + rollback) — every field rule lives in the browser (`frontend/src/pages/einstellungen.js`).
+Key endpoints: `GET /app` (redirects to `/fs?name=index.html`), `GET /fs?name=<file>`, `GET /loads`, `GET /loads?id=<id>&action=transition&to=<state>`, `GET /productions`, `GET /site`, `GET /api/power` (RAM ring of 10 s samples, last 15 min), `GET /api/energy?res=15m` (raw 15-min Wh records; `count` default 96, max 2880, `from`/`to` utc), `GET /api/meta` (`{time, tariffs}`), `GET /api/meter` (raw smart-meter passthrough, spec 007), `GET /api/modbus` (standalone Modbus registers — site.json `"modbusRegisters"`, array of config + live `currentPower`, streamed like `/loads`/`/productions`; not a foreign-descriptor passthrough like `/api/meter` since the device already owns the labels). Spec 011 step 1 deleted the dead surface: `/grid`, `/reload`, `action=set-power`, the bare `?id=` item reads and `meta.version`/`meta.language`. Spec 011 step 2 deleted the device-side config validator: `POST /api/config` now only rejects a body that is not a JSON object (400) or a document `site.load_config()` cannot load (500 + rollback) — every field rule lives in the browser (`frontend/src/pages/einstellungen.js`).
 
 **Device serves raw data; the browser computes analytics.** To keep the tiny ESP32-C3 Berry heap free, the device does no cost or roll-up math: `GET /api/energy` streams raw Wh records (a battery site adds `bat_chg_wh`/`bat_dis_wh` — charge/discharge behind the meter; the SoC is live only) and the browser derives CHF (`frontend/src/lib/aggregate.js`). The smart-meter detail page (spec 007) follows the same rule: `GET /api/meter` returns the raw Tasmota SMI sensor object (`z`) verbatim and the browser labels/groups/derives everything (`frontend/src/lib/metercat.js`, `frontend/src/pages/zaehler.js`).
 
@@ -102,7 +103,7 @@ IndexedDB, syncs incrementally on each visit
 and costs locally. The device shrank to a
 short raw buffer — `KEEP_DAYS = 30` days of slots —
 and the Einstellungen «Daten» tab shows coverage, gaps and CSV export/import.
-Step 3b (issue #8, v1.0.13) then deleted the redundant device side: the day/month
+Step 3b then deleted the redundant device side: the day/month
 roll-ups (`/e1d`, `/e1mo`) are gone,
 `GET /api/energy` serves `res=15m` only, and **the device never rewrites a file** —
 every data write is an append.
@@ -117,4 +118,4 @@ every data write is an append.
 
 ### Build output
 
-`make` at the repo root produces `build/ems-v<VERSION>.tapp` — a zip (no compression) containing minified Berry sources and the Vite-built `index.html` shell. The Makefile runs the Vite build (`ems/frontend`, which bakes the versioned CDN URLs into `index.html`) and always runs `bundle.py --lang-only` for the i18n completeness check. In CDN mode the JS/CSS **and `lang.json`** live on GitHub Pages (gplug-cdn repo), not in the `.tapp` (the ~23 KB dictionary would be a quarter of the package for a fallback nobody can reach — a dead CDN takes the JS bundle with it); the device reads its build language from `<html lang>` in the shell instead. `make build-self` packs the hashed assets *and* `lang.json` into the `.tapp` and points the shell at `/fs?name=`.
+`make` at the repo root produces `build/ems-v<VERSION>.tapp` — a zip (no compression) containing minified Berry sources and the Vite-built `index.html` shell. The Makefile runs the Vite build (`ems/frontend`, which bakes the versioned CDN URLs into `index.html`) and always runs `bundle.py --lang-only` for the i18n completeness check. The JS/CSS **and `lang.json`** always live on GitHub Pages (gplug-cdn repo), not in the `.tapp` (the ~23 KB dictionary would be a quarter of the package for a fallback nobody can reach — a dead CDN takes the JS bundle with it); the device reads its build language from `<html lang>` in the shell instead.
