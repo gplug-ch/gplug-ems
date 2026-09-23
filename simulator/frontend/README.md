@@ -1,16 +1,41 @@
-# React + Vite
+# gPlug EMS Simulator — UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Browser UI for the gPlug EMS simulator (React 19 + Vite 7). It shows every simulated site
+and lets you drive it by hand while an EMS device pointed at the simulator reacts:
 
-Currently, two official plugins are available:
+- **Overview** — number of sites, active and waiting loads, total production.
+- **One tab per site** — grid import/export sliders, a slider per production (PV; battery
+  signed charge/discharge with SoC), and load cards (boiler, heat pump, wallbox, dryer) with
+  their state `inactive → waiting → active`. «Activate» (per load or «Activate all») puts an
+  inactive load into `waiting`; the EMS decides when it becomes `active`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+The UI polls the simulator backend every 3 s. All calls go to `/simulator/…` on the
+Spring Boot backend in `../backend` (port 9090); see `src/api.js`.
 
-## React Compiler
+## Run
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Requires Node and Yarn 4 (Berry, Plug'n'Play — `.pnp.cjs` and `yarn.lock` are committed).
+Start the backend first
+(`make sim-run` at the repo root), then:
 
-## Expanding the ESLint configuration
+```bash
+yarn install --immutable
+yarn dev          # http://localhost:5173, proxies /simulator → http://localhost:9090
+yarn dev:local    # same, reachable from other devices on the LAN
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Build & deploy
+
+```bash
+yarn build        # → dist/ (base path /simulator/)
+yarn deploy       # build + copy dist/ into ../backend/src/main/resources/static/
+```
+
+`make sim-ui` at the repo root does the same as `yarn deploy`. The backend then serves the
+UI at `http://localhost:9090/simulator/`.
+
+## Lint
+
+```bash
+yarn lint
+```

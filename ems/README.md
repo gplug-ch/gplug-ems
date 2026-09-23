@@ -47,7 +47,6 @@ needs the real firmware, so the loop is *write → test in the CLI → flash*.
 
 ```bash
 make                                # build/ems-v<version>.tapp  (CDN shell — default)
-make build-self                     # assets + lang.json packed into the .tapp
 make build-dev                      # shell loads the UI from your `make dev` server
 make LANG=en                        # English build -> ems-v<version>-en.tapp
 
@@ -99,13 +98,12 @@ f-strings are evaluated eagerly in Berry, so hot paths guard their logging with
 
 Preact + htm single-page app, built with **Vite**. The hashed JS/CSS bundle and
 the compiled `lang.json` dictionary are served from a CDN (GitHub Pages) so the
-`.tapp` only ships a tiny `index.html` shell. Both can also be self-hosted for
-restricted networks (spec `specs/002-ui-shell-design-i18n`) — that mode packs
-`lang.json` into the `.tapp` and the app loads it via `/fs?name=lang.json`.
+`.tapp` only ships a tiny `index.html` shell. There is no self-hosted mode:
+the browser needs internet access to load the UI.
 
 ```bash
 cd ems/frontend
-npm install
+npm ci           # from package-lock.json (the Makefile does the same)
 npm run dev      # Vite dev server (HMR) on http://localhost:5173, bound to 0.0.0.0
 npm test         # node --test on the pure helpers (aggregate, archive, metercat, …)
 ```
@@ -121,9 +119,9 @@ style.css       design system (tokens in :root, sampled from the Figma prototype
 src/            ES modules — core.js is the Preact/htm seam; ui.js the barrel
 i18n/de.json    reference translation (authoritative, must be complete)
 i18n/<lang>.json further languages, merged over de.json at build time
-vite.config.js  build config; ASSET_BASE selects CDN vs self-host output
-bundle.py       --lang-only: emits lang.json (packed only by ASSET_BASE=self)
-                + runs the i18n completeness check, which gates every build.
+vite.config.js  build config; ASSET_BASE selects CDN, mirror or dev output
+bundle.py       --lang-only: runs the i18n completeness check, which gates
+                every build (its lang.json output is discarded).
                 The Makefile passes --quiet; run it by hand (no --quiet) to
                 list unused keys
 ```
@@ -194,7 +192,7 @@ The way around it is to never be cross-origin in the first place:
 |-------|--------------------|-------------------|--------------|
 | `DEV_DEVICE_URL=… npm run dev` (**A**) | `localhost:5173` | `localhost:5173` → proxied | no |
 | `ASSET_BASE=dev` shell (**B**) | the device | the device | no (only Vite serves the modules cross-origin, and it allows that) |
-| Flashed `.tapp`, CDN bundle (production) | the device | the device | no — only the CDN serves the bundle, and it sends `Access-Control-Allow-Origin: *` (the `_headers` file emitted by the Vite build) |
+| Flashed `.tapp`, CDN bundle (production) | the device | the device | no — only the CDN serves the bundle (incl. `lang.json`), and GitHub Pages sends `Access-Control-Allow-Origin: *` by default (the `_headers` file the Vite build emits only matters for the Cloudflare deploy) |
 | `http://localhost:5173/?host=192.168.1.42` | `localhost:5173` | the device | **yes — and the device sends none, so this fails** |
 
 `?host=<ip>` (`src/api.js`) is kept for backends that *do* send CORS headers;
@@ -209,13 +207,12 @@ The **asset base** decides where the shipped `index.html` loads its JS/CSS from:
 
 | Mode | Command | index.html references |
 |------|---------|-----------------------|
-| CDN (default) | `npm run build` | `https://<CDN_BASE_URL>/<version>/assets/…` |
-| Self-host | `npm run build:self` | `/fs?name=…` (assets served on-device) |
+| CDN (default) | `npm run build` | `<CDN_BASE_URL>/<version>/assets/…` (default `https://gplug-ch.github.io/gplug-cdn`) |
 | Dev server | `npm run build:dev` | `<DEV_SERVER_URL>/src/entry.js` + HMR client |
 | Internal mirror | `ASSET_BASE=https://host npm run build` | `https://host/<version>/assets/…` |
 
 The version comes from the repo-root `VERSION.txt` (or `APP_VERSION`). Output is
-nested under the version in `dist/<version>/` (or `dist/self/`, `dist/dev/`), so
+nested under the version in `dist/<version>/` (or `dist/dev/`), so
 the deployed paths match the base baked into the shell.
 
 Normally you do not call these directly — the root Makefile drives the Vite
@@ -255,8 +252,8 @@ Adding a language:
 
 1. Copy `i18n/de.json` to `i18n/<lang>.json` and translate the values
    (`meta.lang` is set automatically at build time).
-2. Build with `make LANG=<lang>` at the repo root (and `LANG=<lang>` on
-   `npm run build` for the CDN bundle).
+2. Build with `make LANG=<lang>` at the repo root (a standalone
+   `npm run build` takes it as `UILANG=<lang>` instead — Vite ignores `LANG`).
 
 ---
 
@@ -265,19 +262,25 @@ Adding a language:
 ```
 backend/
   autoexec.be        Tasmota entry point; load()s main.be only
-  main.be            service lifecycle, lazy module loading
+  main.be            boot orchestration: imports the module graph once (integrations
+                     only for configured types; configservice lazily)
+  logger.be          leveled logging (`EMS:` prefix)
+  drivershim.be      bridges module hook functions into tasmota.add_driver()
+  fsx.be             filesystem primitives (CLI vs. Tasmota) + day-bucket file helpers
   ems.be             allocation algorithm (every second)
   site.be            digital twin + one-op-per-tick outbound HTTP scheduler
   meter.be           10 s sampling -> 15-min Wh slots
   store.be           append-only raw record storage (see STORAGE.md)
   webservice.be      HTTP endpoints          configservice.be  GET/POST /api/config
-  integrations/      homeassistant, shelly, gplug, modbustcp, simulator, nethost
+  integrations/      homeassistant, shelly, gplug, modbustcp, simulator
+                     + nethost (shared per-host outbound-HTTP backoff)
   tests/             Berry CLI tests + stubs + fixtures
   examples/          example site.json files
 frontend/
   src/lib/           the browser-side math: aggregate, archive, insights, metercat, csv
   src/pages/         one module per screen
   i18n/              de.json (authoritative) + further languages
+  tests/             node --test suites (*.mjs) + fixtures
 ```
 
 Deeper detail: `backend/CLAUDE.md` (module pattern, heap constraints,
