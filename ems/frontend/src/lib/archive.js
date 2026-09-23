@@ -85,7 +85,13 @@ function open() {
         db.createObjectStore('live', { keyPath: ['siteId', 'kind', 'id'] });
       }
     };
-    r.onsuccess = function () { resolve(r.result); };
+    r.onsuccess = function () {
+      var db = r.result;
+      /* let a newer tab upgrade DB_VERSION instead of hitting `onblocked`
+         (which would latch that tab into «archive unavailable», issue #11) */
+      db.onversionchange = function () { db.close(); dbPromise = null; };
+      resolve(db);
+    };
     r.onerror = function () { reject(r.error || new Error('idb open failed')); };
     r.onblocked = function () { reject(new Error('idb blocked')); };
   }).catch(function (e) {
@@ -494,7 +500,11 @@ function start(api) {
     if (!ok) { notify(); return st; }
     return api.getSite().then(function (site) {
       st.siteId = (site && site.id) ? String(site.id) : null;
-      if (!st.siteId) { st.available = false; notify(); return st; }
+      /* no site id (site.json without "id", or not loadable): the storage
+         itself works, there is just no key to archive under. Pages read from
+         the device buffer (they all require st.siteId) — but this is NOT the
+         FR-1111 «storage blocked» case, so `available` stays true (issue #11). */
+      if (!st.siteId) { notify(); return st; }
       /* FR-1102: the archive belongs to the site id, not the origin. A device
          that reports a different id under the same origin gets its own
          archive; the UI says so once instead of silently mixing them. */

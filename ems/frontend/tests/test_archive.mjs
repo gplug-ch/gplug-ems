@@ -222,3 +222,10 @@ test('putLive rewrites a ring in full and clearSite drops it', async () => {
   await archive.clearSite(site);
   assert.deepStrictEqual(await archive.getLive(site, 'prod', 0), {});
 });
+
+test('a site without an id is not reported as «storage blocked» (issue #11)', async () => {
+  const api = { getSite: () => Promise.resolve({ name: 'no id' }) };
+  const st = await archive.start(api);
+  assert.strictEqual(st.available, true, 'IndexedDB works, only the key is missing');
+  assert.strictEqual(st.siteId, null);
+});
