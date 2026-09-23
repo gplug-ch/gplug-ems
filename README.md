@@ -2,6 +2,45 @@
 
 The **gPlug EMS** is an **Energy Management System** running locally on a [gPlug device](https://gplug.ch/) (ESP32 / Tasmota Berry). It routes the site's surplus PV energy to controllable loads before it is exported to the grid, and records raw 15-minute energy data that the browser UI turns into history and costs.
 
+## The web UI is served from a CDN (gplug-cdn)
+
+> **The device does not carry its own web UI.** The `.tapp` ships only a small
+> `index.html` shell; the browser loads the JS/CSS bundle and the `lang.json`
+> dictionary from the CDN repo
+> [**gplug-ch/gplug-cdn**](https://github.com/gplug-ch/gplug-cdn) on GitHub
+> Pages. If the version a device runs is not published there, its UI does not
+> load.
+
+- **What and why.** The CDN serves the hashed JS/CSS bundle, `lang.json` and
+  `lang-<lang>.json` for non-German builds. The `index.html` shell is never
+  on the CDN; it stays in the `.tapp`. The ESP32-C3 Berry heap is too small to
+  serve the bundle (serving `lang.json` from the device ran out of memory), and
+  keeping the assets out keeps the `.tapp` small. No site data goes to the CDN:
+  every API call still goes to the device.
+- **URL scheme and versioning.** The shell loads from
+  `https://gplug-ch.github.io/gplug-cdn/v<VERSION>/…`, where `<VERSION>` is
+  the repo-root [`VERSION.txt`](VERSION.txt) (e.g. `v0.1.0/assets/index-<hash>.js`,
+  `v0.1.0/lang.json`). The build bakes this URL into the shell. Each version has
+  its own directory, and publishing one never touches the others, so a device
+  running an old `.tapp` keeps loading its own assets.
+- **Release rule.** Every version flashed to a device must first be published
+  to the CDN. `make release` does it as part of the release;
+  `make deploy-cdn` publishes an already-built bundle on its own
+  (`ems/frontend/scripts/deploy-gh-pages.sh`). A `.tapp` built with `make` from
+  an unpublished `VERSION.txt` shows a blank page on the device.
+- **Access.** Publishing pushes to `gplug-ch/gplug-cdn`, so it needs push
+  access to that repo from an authenticated `git`. Override the target repo with
+  `CDN_REPO=<url>`.
+- **The browser needs internet access.** There is no self-hosted build (the old
+  `ASSET_BASE=self` was removed). Without internet, serve the bundle from your own
+  host instead: `make ASSET_BASE=https://mirror.lan` (loads
+  `https://mirror.lan/v<VERSION>/…`; copy `ems/frontend/dist/v<VERSION>/` there,
+  and have the host send `Access-Control-Allow-Origin: *`),
+  or `make CDN_BASE_URL=<url>` for another CDN host. For development,
+  `make build-dev` loads the UI from your `make dev` server.
+
+Build and deploy details: [ems/README.md → Frontend build & CDN deploy](ems/README.md#frontend-build--cdn-deploy).
+
 ## System overview
 
 Each **site** (building) runs its own, standalone EMS. A site has:

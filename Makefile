@@ -160,11 +160,12 @@ release-variant = @"$(MAKE)" build LANG=$(1) ASSET_BASE=$(2) KEEP_DIST=$(3) \
 	&& cp $(BUILD_DIR)/*.tapp $(RELEASE_DIR)/
 
 # Full production release of VERSION.txt:
-#   1. build the German and English CDN .tapps (both into dist/<version>/,
+#   1. build the German and English CDN .tapps (both into dist/v<version>/,
 #      KEEP_DIST=1 keeps the German bundle when the English one is built)
 #   2. publish that bundle to the gplug-cdn repo (GitHub Pages) so the CDN URL
 #      baked into index.html resolves — needs push access to
-#      github.com/gplug-ch/gplug-cdn (see ems/README.md)
+#      github.com/gplug-ch/gplug-cdn (see README.md, "The web UI is served
+#      from a CDN")
 #   3. create the GitHub Release v<version> (gh creates the tag on HEAD) with
 #      both .tapps; notes = .github/release-notes.md + the PR list that
 #      --generate-notes groups via .github/release.yml

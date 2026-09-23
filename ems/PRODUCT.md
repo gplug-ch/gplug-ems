@@ -53,7 +53,7 @@ Two positions a neighbouring product could not truthfully copy:
 
 - **Runtime:** Preact SPA; a Vite build bakes versioned CDN URLs into a tiny `index.html` shell
   served from the `.tapp`. The JS/CSS bundle and `lang.json` load from GitHub Pages
-  (gplug-ch/gplug-cdn); there is no self-hosted build, so the browser needs internet access.
+  (gplug-ch/gplug-cdn, see [root README](../README.md#the-web-ui-is-served-from-a-cdn-gplug-cdn)); there is no self-hosted build, so the browser needs internet access.
 - **Network:** local LAN only; the frontend polls the device (`/api/power`, `/loads`, `/productions`
   every 10 s on Übersicht; raw `/api/energy` synced into the browser's IndexedDB archive every
   15 min, since the device keeps only 30 days). Each device is standalone.

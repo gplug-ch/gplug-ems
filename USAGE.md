@@ -150,8 +150,8 @@ Key fields:
 
 Download it from the [latest GitHub Release](https://github.com/jluthiger/gplug-ems/releases/latest).
 Pick one: `ems-v<VERSION>.tapp` (German UI) or `ems-v<VERSION>-en.tapp`
-(English UI). Either way the device loads the UI assets from the CDN, so the
-browser needs internet access.
+(English UI). Either way the device loads the UI assets from the
+[CDN](README.md#the-web-ui-is-served-from-a-cdn-gplug-cdn), so the browser needs internet access.
 
 Or build it yourself (repo root): `make` → `build/ems-v<VERSION>.tapp`
 (`make LANG=en` for English).

@@ -19,7 +19,7 @@ function lanIPv4() {
 const DEV_PORT = Number(process.env.DEV_SERVER_PORT || 5173);
 
 /* -------------------------------------------------------------------------
- * Build modes (see README "Build & deploy"). The *asset base* is the single
+ * Build modes (see ems/README.md "Frontend build & CDN deploy"). The *asset base* is the single
  * knob that decides where the shipped index.html loads its JS/CSS from:
  *
  *   ASSET_BASE unset | "cdn"  -> <CDN_BASE_URL>/<version>/   (default)
