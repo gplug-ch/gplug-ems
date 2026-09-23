@@ -32,6 +32,7 @@ jobs:
       - name: Build Berry CLI
         if: steps.berry-cache.outputs.cache-hit != 'true'
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq libreadline-dev
           git clone --depth 1 --branch "$BERRY_VERSION" https://github.com/berry-lang/berry.git /tmp/berry
           make -C /tmp/berry
           mkdir -p ~/berry-bin
