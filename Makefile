@@ -46,7 +46,7 @@ TAPP := $(BUILD_DIR)/$(TARGET)-$(VERSION)$(TAPP_SUFFIX).tapp
 
 # `make release` collects the .tapps here (build/ is wiped by every build).
 RELEASE_DIR := release
-GH_REPO_URL := https://github.com/jluthiger/gplug-ems
+GH_REPO_URL := https://github.com/gplug-ch/gplug-ems
 
 # Vite output dir carrying the shell we pack (dev mode has its own subdir).
 ifeq ($(ASSET_BASE),self)

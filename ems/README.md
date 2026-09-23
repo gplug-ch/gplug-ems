@@ -65,7 +65,7 @@ twice and the boot heap roughly doubles — which on
 an ESP32-C3 is a reboot loop. `deploy.sh` deletes the stale ones first.
 
 Releases ship prebuilt `.tapp`s on
-[GitHub Releases](https://github.com/jluthiger/gplug-ems/releases). Bump
+[GitHub Releases](https://github.com/gplug-ch/gplug-ems/releases). Bump
 `VERSION.txt` before a release; it names the `.tapp`s, the CDN asset directory
 and the tag. From a clean `main` that matches `origin/main`, `make release`:
 

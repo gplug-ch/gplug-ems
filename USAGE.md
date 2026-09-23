@@ -166,7 +166,7 @@ UI pages are described in the [README](README.md#installation).
 | Start simulator (Docker) | `cd simulator/backend && docker compose up --build` |
 | Simulator React frontend | `http://localhost:9090/simulator/` |
 | Simulator Swagger UI | `http://localhost:9090/simulator/swagger-ui.html` |
-| Download EMS `.tapp` | https://github.com/jluthiger/gplug-ems/releases/latest |
+| Download EMS `.tapp` | https://github.com/gplug-ch/gplug-ems/releases/latest |
 | Build EMS `.tapp` | `make` (repo root) |
 | Upload `.tapp` to a device | `make flash DEVICE=<gplug-ip>` |
 | Run simulator without Docker | `make sim-run` |
