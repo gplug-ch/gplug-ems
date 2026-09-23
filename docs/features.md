@@ -22,7 +22,7 @@ The gPlug EMS runs standalone on one gPlug device per site. It distributes the s
 - has access to consumption (IN: power from the grid) and export (OUT: power to the grid) values over its smartmeter
 - is based on the configuration file 'site.json' (the former 'ems.json' is gone — one file per device)
 - represents the configured loads as digital twins, polling their state
-- computes only what must run on hardware: load allocation, 10 s power sampling / 15-min Wh integration, and raw record storage. Roll-ups and costs are computed in the browser (see [README](../README.md#where-computation-happens))
+- computes only what must run on hardware: load allocation, 10 s power sampling / 15-min Wh integration, and raw record storage. Roll-ups and costs are computed in the browser (see [architecture](architecture.md#where-computation-happens))
 
 ##### HTTP Requests Examples
 

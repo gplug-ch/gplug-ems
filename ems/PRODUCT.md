@@ -102,7 +102,7 @@ Two positions a neighbouring product could not truthfully copy:
 
 ## Evidence on Hand
 
-- Real product docs: `README.md`, `USAGE.md`, `docs/features.md`, and the implemented/draft specs
+- Real product docs: `README.md`, `USAGE.md`, `docs/architecture.md`, `docs/features.md`, and the implemented/draft specs
   under `specs/` with an implementation-note reconciliation to shipped code.
 - Real shipped UI and copy: `frontend/src/pages/*`, `frontend/i18n/de.json` (authoritative German
   strings), `frontend/src/lib/*` (the browser-side analytics).

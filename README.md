@@ -1,90 +1,95 @@
 # gPlug EMS
 
-The **gPlug EMS** is an **Energy Management System** running locally on a [gPlug device](https://gplug.ch/) (ESP32 / Tasmota Berry). It routes the site's surplus PV energy to controllable loads before it is exported to the grid, and records raw 15-minute energy data that the browser UI turns into history and costs.
+The **gPlug EMS** is an **Energy Management System** that runs locally on a
+[gPlug device](https://gplug.ch/) (ESP32 with Tasmota). It routes your PV
+surplus to controllable loads — heat pump, wallbox, dryer, boiler — by priority
+before it is exported to the grid, and records 15-minute energy data that the
+web UI turns into history and costs (CHF). Each device manages one site on its
+own; no cloud service or server is involved.
 
-## System overview
+## Installation
 
-Each **site** (building) runs its own, standalone EMS. A site has:
+### Prerequisites
 
-- A **Smartmeter** — measures grid import/export at the site
-- A **gPlug device** running **EMS** firmware — the local controller (ESP32 / Tasmota Berry)
-- **Loads** — controllable consumers
-- optional **Producers** — energy sources (PV panels, battery)
+- A gPlug (ESP32-C3) running Tasmota with Berry and the filesystem enabled
+- The gPlug on your LAN, able to reach the devices it reads or switches
+  (Home Assistant, Shelly relays, Modbus TCP inverters, …)
+- A browser **with internet access**: the device serves only a small page shell,
+  the UI itself (JS/CSS and translations) loads from a CDN
 
-A **Simulator** (Spring Boot + React) can stand in for loads, PV and the smart meter for testing and demonstration without physical devices.
+### 1. Get the `.tapp`
 
-## Sites and loads
+Download **one** file from the
+[latest GitHub Release](https://github.com/jluthiger/gplug-ems/releases/latest):
+`ems-v<VERSION>.tapp` (German UI) or `ems-v<VERSION>-en.tapp` (English UI).
 
-Each site can have a combination of the following loads, managed by priority:
+Or build it from a checkout (Node.js + npm, Python 3, `make`, `zip`):
+`make` at the repo root → `build/ems-v<VERSION>.tapp` (`make LANG=en` for English).
 
-| Load                         | Priority | Description                                                                                    |
-| ---------------------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| **Boiler**                   | 1        | Heats water below a threshold temperature up to a target value; primarily heated via heat pump |
-| **Heat pump**    | 1        | Heats boiler and building; has a minimum runtime                                               |
-| **Wallbox**  | 2        | Charges if PV surplus is available; has a minimum runtime                                      |
-| **Dryer**          | 3        | Switches on if surplus is available or a configured start time has passed; has a fixed runtime |
+### 2. Upload it to the gPlug
 
-## EMS allocation algorithm
-
-The EMS runs a **priority-based threshold algorithm** every second on the device
-(`ems/backend/ems.be`):
-
-```
-Surplus = sum of currentPower of all non-battery productions (PV)
-          (a battery is only observed: discharge never activates a load)
-
-Consider only loads in state waiting or active, sorted by priority (ascending).
-For each such load:
-  if load is waiting AND Surplus ≥ load.currentPower (its rated power):
-    → activate load, reduce Surplus by load.currentPower
-  if load is active:
-    if Surplus ≥ load.currentPower − 200 W  → keep running
-    else if minimum runtime (minimalDuration) not reached → keep running
-    else → back to waiting
-    (a load kept running still reduces Surplus by its power)
-
-Loads in state inactive are never touched; the user moves a load to waiting.
+```sh
+make flash DEVICE=<gplug-ip>                          # built from this checkout
+ems/backend/deploy.sh <gplug-ip> ems-v<VERSION>.tapp  # a downloaded release
 ```
 
-## PV producer
+Or by hand in the Tasmota web UI (`http://<gplug-ip>/`) under
+**Tools → Manage File system**:
 
-Each site can have zero, one or more PV systems. Surplus power is distributed to the site's loads first; anything remaining is exported to the grid.
+1. **Delete every existing `ems-*.tapp`** — Tasmota starts every `.tapp` in the
+   filesystem root, and two EMS versions side by side send the gPlug into a
+   reboot loop.
+2. Upload the new `.tapp`.
+3. Restart the device. An existing `site.json` is kept.
 
-## Where computation happens
+### 3. Configure the site
 
-The gPlug is an ESP32-C3 with a very small Berry heap, so the device does only
-what *must* run on hardware. Everything derived — roll-ups and money —
-is computed in the browser from raw data the device serves.
+The EMS reads everything from one file, `site.json`: site name, loads,
+productions (PV, battery), grid meter, tariffs. Start from the example closest to
+your setup in [`ems/backend/examples/`](ems/backend/examples/) (simulator, gPlug
+meter, Home Assistant, Shelly, Modbus TCP), adapt IDs, URLs and powers, and upload
+it through the same Tasmota file manager. After that, edit it in the EMS UI under
+**Einstellungen**. The field reference is in [USAGE.md](USAGE.md#configure-the-site).
 
-**On the device (`ems/backend/`):**
+## Usage
 
-| Computation | Where | Why on device |
-| ----------- | ----- | ------------- |
-| Load allocation (priority sort, greedy activation, 200 W hysteresis, minimum runtime) | `ems.be` | Drives the relays; must run without a browser |
-| Energy integration — samples grid / PV / active loads every 10 s, accumulates `W × dt / 3600` into Wh, seals a record at each 15-min boundary | `meter.be` | Needs continuous sampling |
-| Raw record storage — delta encoding, per-day bucket files, retention pruning (30 days) | `store.be` | Local persistence; every write is an append, files are never rewritten |
-| Unit conversion of integration readings (kW → W) | `integrations/` | Normalises vendor data at the source |
+Open the EMS at
 
-**In the browser (`ems/frontend/`):**
+```
+http://<gplug-ip>/app
+```
 
-| Computation | Where |
-| ----------- | ----- |
-| Day / month roll-ups, energy costs in CHF | `src/lib/aggregate.js` |
-| History archive in IndexedDB, incremental sync, gap detection, CSV export/import | `src/lib/archive.js` |
-| Smart-meter labelling, grouping and derived values | `src/lib/metercat.js` |
-| All `site.json` configuration validation | `src/pages/einstellungen.js` |
+| Page | What it shows |
+|------|---------------|
+| **Übersicht** | Live power flow of grid, productions and loads; move a load between `inactive`, `waiting` and `active` |
+| **Verlauf** | Energy and cost history from 15 minutes up to quarters, CSV export |
+| **Zähler** | Smart-meter readings (only when the device has meter data) |
+| **Modbus** | Standalone Modbus registers, e.g. submeters (only when configured) |
+| **Einstellungen** | Site, loads, productions, grid, Modbus, tariffs, data, gPlug and pro settings |
 
-The device APIs are correspondingly plain: `GET /api/energy?res=15m` streams raw
-Wh records and `GET /api/meter` returns the
-Tasmota smart-meter sensor object verbatim. Neither computes a total or a price.
+**Loads.** A load the EMS may switch must be in state `waiting`. Whenever the PV
+surplus covers its power, the EMS activates it, highest priority (lowest number)
+first, and returns it to `waiting` once the surplus is gone and its minimum
+runtime has passed. `inactive` loads are left alone. Only `shelly` and
+`simulator` loads can actually be switched.
 
-## Repository components
+**Integrations.** Each load, production and the grid names where its values come
+from: `gplug` (the gPlug's own smart-meter or attached-inverter data),
+`homeassistant`, `shelly`, `modbustcp` or `simulator`. Configure them per item in
+**Einstellungen**; see [USAGE.md](USAGE.md) for the fields.
 
-| Component              | Path                  | Description                                                                               |
-| ---------------------- | --------------------- | ----------------------------------------------------------------------------------------- |
-| **EMS backend**        | `ems/backend/`        | Tasmota Berry scripting backend, packaged as a `.tapp` app running on ESP32 gPlug devices |
-| **EMS frontend**       | `ems/frontend/`       | Preact web UI; the `.tapp` ships an `index.html` shell, the bundle is served from a CDN   |
-| **Simulator backend**  | `simulator/backend/`  | Spring Boot 4 / Kotlin backend that simulates loads and PV output                         |
-| **Simulator frontend** | `simulator/frontend/` | React 19 + Vite UI for controlling the simulator                                          |
+**Data.** The gPlug keeps the last 30 days of 15-minute records. The browser
+copies them into its own archive on every visit, so history older than that lives
+in the browser. **Einstellungen → Daten** shows the covered period and gaps and
+exports or imports the archive as CSV — export regularly, or always use the same
+browser.
 
-See the `CLAUDE.md` files in each component directory for commands and detailed architecture.
+## Further reading
+
+| Document | Content |
+|----------|---------|
+| [USAGE.md](USAGE.md) | `site.json` reference, running the simulator |
+| [docs/architecture.md](docs/architecture.md) | System overview, allocation algorithm, device vs. browser computation, repository layout |
+| [docs/features.md](docs/features.md) | Feature-level spec of backend and frontend |
+| [ems/README.md](ems/README.md) | Developer guide: build, test, flash, frontend dev server, CDN release |
+| [simulator/](simulator/) | Spring Boot + React simulator for loads, PV and smart meter |
