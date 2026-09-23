@@ -18,8 +18,8 @@ global._tapp_wd = wd
 if size(wd) sys.path().push(wd) end
 
 # Boot the application by load()'ing ONLY main.be. main.be then `import`s the
-# whole module graph (webservice, udpdriver, site ->
-# integrations, ems, store, meter, configservice, vzev, ...), so every module
+# whole module graph (webservice, site -> integrations, ems, store, meter,
+# configservice, ...), so every module
 # is built exactly ONCE via the import cache.
 #
 # The previous version load()'d every module explicitly AND main.be import'd
@@ -67,8 +67,7 @@ _b['load'] = def ()
     # already there) and pop_path()s it by VALUE when main.be returns — which
     # removes our own entry, since this autoexec's load() already popped the
     # other one. From then on every request-time import (the lazy
-    # `import configservice` on the first POST /api/config, `import vzev` on
-    # enable) failed with "module 'configservice' not found" and the handler
+    # `import configservice` on the first POST /api/config) failed with "module 'configservice' not found" and the handler
     # died without a response (issue #11). Put the prefix back for good.
     import sys
     var wd = _b['wd']

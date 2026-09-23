@@ -14,7 +14,6 @@ import * as archive from './lib/archive.js';
     history: html`<svg viewBox="0 0 20 20" class="nav-icon" aria-hidden="true"><path d="M3 3v13.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5.5 12.5l3.5-4 3 2.5 4.5-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
     meter: html`<svg viewBox="0 0 20 20" class="nav-icon" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 10l3.5-2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.2 11.5h1.6M14.2 11.5h1.6M10 4.2v1.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
     modbus: html`<svg viewBox="0 0 20 20" class="nav-icon" aria-hidden="true"><rect x="3.5" y="6" width="13" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 6V3.8M10 6V3.8M13.5 6V3.8M6.5 14v2.2M10 14v2.2M13.5 14v2.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
-    vzev: html`<svg viewBox="0 0 20 20" class="nav-icon" aria-hidden="true"><circle cx="10" cy="4" r="2.2" fill="currentColor"/><circle cx="4" cy="15" r="2.2" fill="currentColor"/><circle cx="16" cy="15" r="2.2" fill="currentColor"/><path d="M10 6.5v4M10 10.5l-4.5 3M10 10.5l4.5 3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`,
     settings: html`<svg width="16" height="17" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M7.96387 10.7915C9.27554 10.7915 10.3389 9.72818 10.3389 8.4165C10.3389 7.10483 9.27554 6.0415 7.96387 6.0415C6.65219 6.0415 5.58887 7.10483 5.58887 8.4165C5.58887 9.72818 6.65219 10.7915 7.96387 10.7915Z" stroke="currentColor"/>
       <path d="M9.36127 0.620333C9.07073 0.5 8.70181 0.5 7.96398 0.5C7.22615 0.5 6.85723 0.5 6.56669 0.620333C6.37446 0.699906 6.19979 0.816584 6.05268 0.963698C5.90556 1.11081 5.78889 1.28548 5.70931 1.47771C5.63648 1.65425 5.60719 1.86088 5.5961 2.16092C5.59095 2.37778 5.53087 2.58979 5.4215 2.77711C5.31212 2.96444 5.15701 3.12096 4.97069 3.23204C4.78133 3.33794 4.56819 3.39407 4.35123 3.39518C4.13427 3.39629 3.92058 3.34234 3.73015 3.23838C3.46415 3.09746 3.27177 3.01988 3.08098 2.99454C2.66482 2.93981 2.24395 3.05258 1.9109 3.30804C1.66231 3.50042 1.47706 3.81946 1.10815 4.45833C0.73923 5.09721 0.55398 5.41625 0.513605 5.72896C0.486399 5.93515 0.500083 6.14468 0.553874 6.34558C0.607665 6.54649 0.70051 6.73482 0.827105 6.89983C0.944271 7.05183 1.10815 7.17929 1.36227 7.33921C1.73673 7.57433 1.9774 7.97492 1.9774 8.41667C1.9774 8.85842 1.73673 9.259 1.36227 9.49333C1.10815 9.65404 0.94348 9.7815 0.827105 9.9335C0.70051 10.0985 0.607665 10.2868 0.553874 10.4878C0.500083 10.6887 0.486399 10.8982 0.513605 11.1044C0.554771 11.4163 0.73923 11.7361 1.10735 12.375C1.47706 13.0139 1.66152 13.3329 1.9109 13.5253C2.07591 13.6519 2.26424 13.7447 2.46515 13.7985C2.66605 13.8523 2.87558 13.866 3.08177 13.8388C3.27177 13.8135 3.46415 13.7359 3.73015 13.595C3.92058 13.491 4.13427 13.437 4.35123 13.4382C4.56819 13.4393 4.78133 13.4954 4.97069 13.6013C5.35306 13.823 5.58027 14.2307 5.5961 14.6724C5.60719 14.9733 5.63569 15.1791 5.70931 15.3556C5.78889 15.5479 5.90556 15.7225 6.05268 15.8696C6.19979 16.0167 6.37446 16.1334 6.56669 16.213C6.85723 16.3333 7.22615 16.3333 7.96398 16.3333C8.70181 16.3333 9.07073 16.3333 9.36127 16.213C9.5535 16.1334 9.72817 16.0167 9.87528 15.8696C10.0224 15.7225 10.1391 15.5479 10.2186 15.3556C10.2915 15.1791 10.3208 14.9733 10.3319 14.6724C10.3477 14.2307 10.5749 13.8222 10.9573 13.6013C11.1466 13.4954 11.3598 13.4393 11.5767 13.4382C11.7937 13.437 12.0074 13.491 12.1978 13.595C12.4638 13.7359 12.6562 13.8135 12.8462 13.8388C13.0524 13.866 13.2619 13.8523 13.4628 13.7985C13.6637 13.7447 13.8521 13.6519 14.0171 13.5253C14.2664 13.3337 14.4509 13.0139 14.8198 12.375C15.1887 11.7361 15.374 11.4171 15.4144 11.1044C15.4416 10.8982 15.4279 10.6887 15.3741 10.4878C15.3203 10.2868 15.2274 10.0985 15.1009 9.9335C14.9837 9.7815 14.8198 9.65404 14.5657 9.49413C14.3804 9.38123 14.2267 9.22317 14.1192 9.03473C14.0116 8.84629 13.9536 8.63363 13.9506 8.41667C13.9506 7.97492 14.1912 7.57433 14.5657 7.34C14.8198 7.17929 14.9845 7.05183 15.1009 6.89983C15.2274 6.73482 15.3203 6.54649 15.3741 6.34558C15.4279 6.14468 15.4416 5.93515 15.4144 5.72896C15.3732 5.41704 15.1887 5.09721 14.8206 4.45833C14.4509 3.81946 14.2664 3.50042 14.0171 3.30804C13.8521 3.18145 13.6637 3.0886 13.4628 3.03481C13.2619 2.98102 13.0524 2.96734 12.8462 2.99454C12.6562 3.01988 12.4638 3.09746 12.197 3.23838C12.0067 3.3422 11.7931 3.39607 11.5763 3.39496C11.3595 3.39386 11.1465 3.3378 10.9573 3.23204C10.7709 3.12096 10.6158 2.96444 10.5065 2.77711C10.3971 2.58979 10.337 2.37778 10.3319 2.16092C10.3208 1.86008 10.2923 1.65425 10.2186 1.47771C10.1391 1.28548 10.0224 1.11081 9.87528 0.963698C9.72817 0.816584 9.5535 0.699906 9.36127 0.620333Z" stroke="currentColor"/>
@@ -76,9 +75,6 @@ import * as archive from './lib/archive.js';
        actually has at least one configured register (Einstellungen -> Modbus,
        site.json "modbusRegisters") — hidden on sites without one. */
     { path: '/modbus', key: 'nav.modbus', icon: 'modbus', gate: 'modbus', active: function (p) { return p.indexOf('/modbus') === 0; } },
-    /* «vZEV» is opt-in (default off, most sites have no energy community):
-       shown only once the user flips the toggle in Einstellungen → vZEV. */
-    { path: '/vzev', key: 'nav.vzev', icon: 'vzev', gate: 'vzev', active: function (p) { return p.indexOf('/vzev') === 0; } },
     { path: '/einstellungen', key: 'nav.settings', icon: 'settings', active: function (p) { return p.indexOf('/einstellungen') === 0; } }
   ];
 
@@ -87,8 +83,7 @@ import * as archive from './lib/archive.js';
       <nav class="nav" aria-label=${t('nav.menu')}>
         ${NAV.filter(function (item) {
           return (item.gate !== 'meter' || props.showMeter) &&
-                 (item.gate !== 'modbus' || props.showModbus) &&
-                 (item.gate !== 'vzev' || props.showVzev);
+                 (item.gate !== 'modbus' || props.showModbus);
         }).map(function (item) {
           var active = item.active(props.path);
           return html`
@@ -116,8 +111,6 @@ import * as archive from './lib/archive.js';
     var showMeter = meterSt[0], setShowMeter = meterSt[1];
     var modbusSt = useState(false);
     var showModbus = modbusSt[0], setShowModbus = modbusSt[1];
-    var vzevSt = useState(false);
-    var showVzev = vzevSt[0], setShowVzev = vzevSt[1];
     var archSt = useState(false);
     var archBlocked = archSt[0], setArchBlocked = archSt[1];
 
@@ -179,15 +172,6 @@ import * as archive from './lib/archive.js';
         .catch(function () { /* keep hidden; offline handled by onStatus */ });
     }, []);
 
-    /* reveal the «vZEV» nav entry only once enabled from Einstellungen (default
-       off — most sites have no energy community). One probe on mount PLUS a
-       live subscription (api.onVzevInfo) so saving the toggle in Einstellungen
-       updates the menu immediately, without waiting for a reload. */
-    useEffect(function () {
-      var stop = api.onVzevInfo(function (info) { setShowVzev(!!(info && info.enabled)); });
-      api.getVzevInfo().catch(function () { /* keep hidden; offline handled by onStatus */ });
-      return stop;
-    }, []);
 
     /* close the mobile menu whenever the route changes */
     useEffect(function () { setMenuOpen(false); }, [cur.path]);
@@ -198,7 +182,7 @@ import * as archive from './lib/archive.js';
       <div class="shell">
         <aside class="sidebar">
           <${Logo} />
-          <${NavList} path=${cur.path} showMeter=${showMeter} showModbus=${showModbus} showVzev=${showVzev} />
+          <${NavList} path=${cur.path} showMeter=${showMeter} showModbus=${showModbus} />
           <div class="sidebar-foot">${__APP_VERSION__}</div>
         </aside>
 
@@ -209,7 +193,7 @@ import * as archive from './lib/archive.js';
         </div>
         ${menuOpen ? html`
           <div class="drawer">
-            <${NavList} path=${cur.path} showMeter=${showMeter} showModbus=${showModbus} showVzev=${showVzev} onNavigate=${function () { setMenuOpen(false); }} />
+            <${NavList} path=${cur.path} showMeter=${showMeter} showModbus=${showModbus} onNavigate=${function () { setMenuOpen(false); }} />
           </div>` : null}
 
         <main class="content">

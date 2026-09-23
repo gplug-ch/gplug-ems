@@ -3,7 +3,6 @@
 
 import logger
 import webservice
-import udpdriver
 import site
 import ems
 import store
@@ -72,105 +71,9 @@ _load_integrations = def ()
     end
 end
 _load_integrations()
-# NOTE: no top-level `import vzev` (single biggest module, ~21 KB minified,
-# only loaded when the site participates in a community — _vzev_wanted below)
-# and no `import configservice` (~9 KB resident, only loaded on the first
-# POST /api/config — the GET is served as a plain file stream by the stub).
-
-# --- lazy vZEV loading (startup-heap issue #2) ------------------------------
-# true once `import vzev` + vzev.start() have run; read by meter.be's
-# slot-close hook (via the global module) to skip the announce hand-off on
-# sites where vzev was never loaded.
-_vzev_loaded = false
-_vzev_stub_driver = nil
-
-# Decide from /vzev.json alone (same path as vzev.be's VZEV_FILE) whether the
-# vZEV backend should boot, WITHOUT importing the module. Mirrors
-# vzev.get_info()'s 'enabled' semantics: an explicit info.enabled wins;
-# otherwise a configured member list implies participation (pre-spec-009
-# files). No/invalid file -> brand-new site -> off.
-_vzev_wanted = def ()
-    import json
-    try
-        var f = open('/vzev.json', 'r')
-        var raw = f.read()
-        f.close()
-        var d = json.load(raw)
-        if d == nil return false end
-        var info = d.find('info', nil)
-        if isinstance(info, map) && info.contains('enabled')
-            var en = info['enabled']
-            return en == true || en == 'true' || en == '1' || en == 1
-        end
-        return size(d.find('members', [])) > 0
-    except ..
-        return false
-    end
-end
-
-# Import + start the real vZEV backend (one-time compile spike, then it owns
-# its /api/vzev/* routes). The stub driver is removed so a webserver restart
-# no longer re-registers the stub route; the already-registered stub handler
-# stays harmless because it delegates once _vzev_loaded is set.
-_start_vzev = def ()
-    import vzev
-    vzev.start()
-    _vzev_loaded = true
-    if _vzev_stub_driver != nil
-        tasmota.remove_driver(_vzev_stub_driver)
-        _vzev_stub_driver = nil
-    end
-end
-
-# Stub /api/vzev/info handler, registered only when vzev is NOT loaded. Keeps
-# the Einstellungen enable-toggle alive (frontend enables vZEV via
-# GET /api/vzev/info?action=set&enabled=true — served by vzev itself, so a
-# plain skip would make vZEV impossible to ever turn on). Any action=set
-# loads the real module on the spot and lets it handle the request
-# (validation + persistence); a plain GET answers from /vzev.json without
-# touching the module. The other /api/vzev/* routes stay 404 while disabled —
-# the frontend .catch()es them and hides the vZEV pages anyway.
-_vzev_stub_info = def ()
-    import webserver
-    if !_vzev_loaded && webserver.has_arg('action') && webserver.arg('action') == 'set'
-        _start_vzev()
-    end
-    if _vzev_loaded
-        import vzev
-        vzev.info_request()
-        return
-    end
-    import json
-    var info = {}
-    try
-        var f = open('/vzev.json', 'r')
-        var raw = f.read()
-        f.close()
-        var d = json.load(raw)
-        if d != nil
-            var inf = d.find('info', nil)
-            if isinstance(inf, map) info = inf end
-        end
-    except ..
-    end
-    var out = {
-        'representative_name':    info.find('representative_name', ''),
-        'representative_contact': info.find('representative_contact', ''),
-        'connection_point_id':    info.find('connection_point_id', ''),
-        'enabled': false
-    }
-    webserver.content_open(200, 'application/json')
-    webserver.content_send(json.dump(out))
-    webserver.content_close()
-end
-
-_vzev_stub_web = def ()
-    try
-        import webserver
-        webserver.on('/api/vzev/info', /-> _vzev_stub_info(), webserver.HTTP_GET)
-    except ..
-    end
-end
+# NOTE: no top-level `import configservice` (~9 KB resident, only loaded on
+# the first POST /api/config — the GET is served as a plain file stream by the
+# stub).
 
 # --- lazy configservice (startup-heap issue #2) -----------------------------
 # configservice costs ~9 KB resident but is only exercised from the settings
@@ -250,10 +153,9 @@ _net_ready = def()
     # `up` is the only authoritative flag. The old test also accepted
     # w.contains("ip"), but Tasmota puts an `ip` key in the map even while the
     # station is DOWN (it reads "0.0.0.0"), so the whole gate degraded to
-    # "always true": start_services() ran on the very first 5 s tick and
-    # udpdriver.start() opened its multicast socket before association — the
-    # hard fault documented at the boot gate below, inside Tasmota's 10 s
-    # fast-reboot window.
+    # "always true": start_services() ran on the very first 5 s tick, before
+    # association — the hard fault documented at the boot gate below, inside
+    # Tasmota's 10 s fast-reboot window.
     # Keep the ip check, but as a VALUE test, not a key test.
     if w.find("up", false) != true
         return false
@@ -264,7 +166,7 @@ end
 
 # Run one boot stage, logging (never propagating) a failure. A stage that
 # raises used to abort the whole of start_services() with nothing but
-# Tasmota's generic backtrace, so the later stages (store, vzev, meter) went
+# Tasmota's generic backtrace, so the later stages (store, meter) went
 # missing with no hint of which one died.
 _stage = def(name, fn)
     try
@@ -276,70 +178,9 @@ _stage = def(name, fn)
     end
 end
 
-# Services that need an associated station (they open sockets). Split out of
-# start_services() so an offline boot can bring up the local HTTP/EMS/metering
-# stack and attach these later, instead of faulting the VM on a socket call.
-_net_started = false
-_start_net_services = nil
-_start_net_services = def()
-    if _net_started
-        return
-    end
-    _net_started = true
-
-    # UDP transport (joins the multicast group using the messaging config)
-    _stage("udpdriver", /-> udpdriver.start())
-
-    # vZEV community backend (spec 005): member registry, deterministic
-    # allocation, 15-min slot exchange over the existing UDP multicast. Started
-    # after udpdriver (it chains the receive callback, FR-508) and before the
-    # meter, whose slot-close hook calls vzev.announce_slot().
-    # LAZY (startup-heap issue #2): only imported when the site participates;
-    # otherwise the tiny info stub is registered so vZEV can still be enabled.
-    if _vzev_wanted()
-        _stage("vzev", def()
-            import vzev
-            vzev.start()
-            _vzev_loaded = true
-        end)
-    else
-        _vzev_stub_driver = drivershim.make({'web_add_handler': _vzev_stub_web})
-        tasmota.add_driver(_vzev_stub_driver)
-        _vzev_stub_web()
-        logger.logMsg(logger.lInfo, "vzev disabled: module not loaded (stub on /api/vzev/info)")
-    end
-
-    # Advertise this device's webservice URL over multicast — only when the
-    # transport actually joined (no messaging.udp block -> UDP stays off, and
-    # a send would just log "not started, cannot send")
-    if !udpdriver.started()
-        return
-    end
-    var w = tasmota.wifi()
-    var ip = w != nil ? w.find("ip", "") : ""
-    if type(ip) == "string" && size(ip) > 0 && ip != "0.0.0.0"
-        udpdriver.send("http://" + ip + "/")
-        logger.logMsg(logger.lInfo, "Advertised: http://" + ip + "/")
-    end
-end
-
-# Poll for a late association on a device that booted offline, and attach the
-# socket-owning services then. Costs one map lookup per 10 s until WiFi is up.
-_net_watch = nil
-_net_watch = def()
-    if _net_started
-        return
-    end
-    if _net_ready()
-        _start_net_services()
-    else
-        tasmota.set_timer(10000, /-> _net_watch())
-    end
-end
-
 # `net_up` is false only on the bounded-wait fallback below (no association
-# after ~30 s). The socket-owning services are then deferred to _net_watch()
-# instead of being started against a down station.
+# after ~30 s). Nothing here opens a socket itself — the integration polls are
+# guarded by site.be's own _net_ready — so the local stack starts either way.
 #
 # Every stage runs under _stage(): one failing service must not take the rest
 # of the boot with it, and the log has to name the stage that died.
@@ -359,9 +200,7 @@ start_services = def(net_up)
 
     # Load site configuration FIRST (builds loads/productions/grid item maps
     # from site.json; live values are filled lazily by the poll scheduler, no
-    # boot fetch burst). Must precede udpdriver.start(), which reads the
-    # messaging.udp config from the loaded site — otherwise the UDP multicast
-    # transport never starts ("no messaging.udp config, not starting").
+    # boot fetch burst).
     _stage("site config", /-> site.load_config())
 
     # Start EMS driver: runs allocation every second AND advances the outbound
@@ -371,12 +210,9 @@ start_services = def(net_up)
     # Load persisted energy rings and start 10s metering
     _stage("store", /-> store.load())
 
-    if net_up
-        _start_net_services()
-    else
+    if !net_up
         logger.logMsg(logger.lWarn,
-            "boot: no WiFi association, UDP/vZEV deferred until the station comes up")
-        _net_watch()
+            "boot: no WiFi association, integration polls wait for the station")
     end
 
     _stage("meter", /-> meter.start())
@@ -397,39 +233,20 @@ stop_services = def()
         _config_stub_driver = nil
     end
 
-    # Stop UDP transport — only if it was ever started.
-    # _net_started stays true so a still-pending _net_watch() timer cannot
-    # bring the sockets back up behind a shutdown.
-    if _net_started
-        udpdriver.stop()
-    end
-
     # Stop EMS driver
     ems.stop()
 
     # Stop metering
     meter.stop()
-
-    # Stop vZEV backend (persists peer data if dirty) — only if it was loaded
-    if _vzev_loaded
-        import vzev
-        vzev.stop()
-    end
-    if _vzev_stub_driver != nil
-        tasmota.remove_driver(_vzev_stub_driver)
-        _vzev_stub_driver = nil
-    end
 end
 
-# Boot gate: WiFi must be ASSOCIATED before the network services start.
+# Boot gate: wait for WiFi to be ASSOCIATED before the services start.
 #
-# start_services() opens a UDP multicast socket (udpdriver.start ->
-# udp.begin_multicast) and kicks off the vZEV announce loop + integration
-# polling. Creating a socket before WiFi is associated hard-faults the Berry VM
-# at boot (Guru Meditation / Load access fault — same failure site.be _net_ready
-# guards the integration fetches against). On the ESP32-C3 that fault is a reset
-# loop, which presents as "the device never connects to WiFi" whenever this
-# .tapp is deployed.
+# start_services() kicks off integration polling. Opening a socket before WiFi
+# is associated hard-faults the Berry VM at boot (Guru Meditation / Load access
+# fault — the failure site.be _net_ready guards the integration fetches
+# against). On the ESP32-C3 that fault is a reset loop, which presents as "the
+# device never connects to WiFi" whenever this .tapp is deployed.
 #
 # A blind fixed delay is unsafe: the more Berry the boot compiles, the later
 # association completes, so the timer began firing before WiFi was up reliably.
@@ -445,7 +262,7 @@ _try_start = def()
     if _net_ready()
         start_services(true)
     elif _boot_tries >= 30                 # give up waiting after ~30 s
-        start_services(false)              # locals only; sockets follow later
+        start_services(false)              # boot anyway; polls wait for WiFi
     else
         tasmota.set_timer(1000, /-> _try_start())
     end

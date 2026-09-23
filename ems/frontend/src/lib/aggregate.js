@@ -8,7 +8,7 @@
      Quartale = 3 × 1mo   (calendar quarter)
    Aggregation SUMS the Wh fields and RE-DERIVES CHF from the summed Wh via
    the tariff formulas (spec 001 FR-108) — never by summing rounded CHF. */
-var WH_FIELDS = ['imp_wh', 'exp_wh', 'pv_wh', 'vzev_in_wh', 'vzev_out_wh'];
+var WH_FIELDS = ['imp_wh', 'exp_wh', 'pv_wh'];
 /* spec 009 FR-909: the grid-import Wh split by tariff window, carried
    alongside WH_FIELDS so coarse buckets sum the split instead of re-deriving
    it from re-averaged coarse Wh. Only populated when HT/NT is configured. */
@@ -26,26 +26,20 @@ var BAT_FIELDS = ['bat_chg_wh', 'bat_dis_wh'];
 
   /* Cost re-derivation from Wh quantities + tariffs (spec 001 FR-108).
      `null` quantities propagate to `null` cost fields. Returns a shallow copy
-     of `rec` with the five CHF fields recomputed. */
+     of `rec` with the CHF fields recomputed. */
   function deriveCosts(rec, tariffs) {
     tariffs = tariffs || {};
     var gi = num(tariffs.grid_import_chf_kwh, 0.26);
     var gf = num(tariffs.grid_feedin_chf_kwh, 0.18);
-    var vi = num(tariffs.vzev_import_chf_kwh, 0.22);
-    var ve = num(tariffs.vzev_export_chf_kwh, 0.22);
 
     var imp = rec.imp_wh, exp = rec.exp_wh, pv = rec.pv_wh;
-    var vin = rec.vzev_in_wh || 0, vout = rec.vzev_out_wh || 0;
-
     var out = {};
     for (var k in rec) out[k] = rec[k];
 
     out.cost_import_chf = imp === null || imp === undefined
-      ? null : round2((imp - vin) / 1000 * gi);
+      ? null : round2(imp / 1000 * gi);
     out.revenue_feedin_chf = exp === null || exp === undefined
-      ? null : round2((exp - vout) / 1000 * gf);
-    out.cost_vzev_chf = round2(vin / 1000 * vi);
-    out.revenue_vzev_chf = round2(vout / 1000 * ve);
+      ? null : round2(exp / 1000 * gf);
     out.saving_selfuse_chf = (pv === null || pv === undefined || exp === null || exp === undefined)
       ? null : round2(Math.max(0, (pv - exp) / 1000 * (gi - gf)));
 
@@ -68,9 +62,7 @@ var BAT_FIELDS = ['bat_chg_wh', 'bat_dis_wh'];
     return (v === null || v === undefined || isNaN(v)) ? dflt : Number(v);
   }
 
-  /* spec 009 FR-909 — tariff-window classification (local time, mirrors
-     lib/vzev.js:slotTariff). Kept local to avoid a circular import between the
-     two pure libs. */
+  /* spec 009 FR-909 — tariff-window classification (local time). */
   var DAY_TOKENS = { mo: 0, mon: 0, di: 1, tu: 1, tue: 1, mi: 2, we: 2, wed: 2,
                      do: 3, th: 3, thu: 3, fr: 4, fri: 4, sa: 5, sat: 5,
                      so: 6, su: 6, sun: 6 };
@@ -120,16 +112,15 @@ var BAT_FIELDS = ['bat_chg_wh', 'bat_dis_wh'];
     return false;
   }
 
-  /* Pre-split a 15-min base record's grid-import Wh (imp − vzev_in) into
+  /* Pre-split a 15-min base record's grid-import Wh into
      grid_ht_wh / grid_nt_wh by the tariff window of its own ts. No-op (returns
      the record unchanged) when HT/NT is not configured, so the flat path and
      all existing tests are untouched (NFR-903). */
   function splitHtNt(rec, tariffs) {
     if (!hasHtNt(tariffs)) return rec;
-    var imp = rec.imp_wh, vin = rec.vzev_in_wh || 0;
+    var imp = rec.imp_wh;
     if (imp === null || imp === undefined) return rec;
-    var grid = imp - vin;
-    if (grid < 0) grid = 0;
+    var grid = Math.max(0, imp);
     var out = {};
     for (var k in rec) out[k] = rec[k];
     if (slotIsHt(rec.ts, tariffs)) { out.grid_ht_wh = grid; out.grid_nt_wh = 0; }

@@ -8,13 +8,13 @@
 # flashed with older .tapps keep resolving their assets.
 #
 # Version resolution matches vite.config.js: APP_VERSION env var, else
-# ../backend/VERSION.txt. Override the target repo with CDN_REPO.
+# ../../VERSION.txt (repo root). Override the target repo with CDN_REPO.
 set -euo pipefail
 
 FRONTEND_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CDN_REPO="${CDN_REPO:-https://github.com/gplug-ch/gplug-cdn.git}"
 
-VERSION="${APP_VERSION:-v$(tr -d '[:space:]' < "$FRONTEND_DIR/../backend/VERSION.txt")}"
+VERSION="${APP_VERSION:-v$(tr -d '[:space:]' < "$FRONTEND_DIR/../../VERSION.txt")}"
 SRC="$FRONTEND_DIR/dist/$VERSION"
 if [ ! -d "$SRC" ]; then
   echo "error: $SRC not found — run 'npm run build' first" >&2

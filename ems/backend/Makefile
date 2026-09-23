@@ -4,7 +4,7 @@
 # CONFIGURATION
 # =============================================================================
 
-VERSION := v$(shell cat VERSION.txt)
+VERSION := v$(shell cat ../../VERSION.txt)
 TARGET := ems
 
 # UI language (spec 002): `make tapp LANG=en` builds an English .tapp.
@@ -36,9 +36,6 @@ APP_SRC := $(shell ls *.be)
 
 # Integration files
 INTEGRATION_SRC := $(wildcard integrations/*.be)
-
-# Messaging files
-MESSAGING_SRC := $(wildcard messaging/*.be)
 
 # Frontend build (Vite). The UI JS/CSS is served from a CDN by default; only
 # the index.html shell (+ lang.json) is packed into the .tapp. Override the
@@ -88,9 +85,6 @@ minify: $(BUILD_DIR)
 	@for file in $(INTEGRATION_SRC); do \
 		python3 minify.py "$$file" "$(BUILD_DIR)/$$(basename "$$file")"; \
 	done
-	@for file in $(MESSAGING_SRC); do \
-		python3 minify.py "$$file" "$(BUILD_DIR)/$$(basename "$$file")"; \
-	done
 	@echo "Minification complete"
 
 # Build the UI with Vite (hashed, minified, versioned) and pack only the shell.
@@ -125,7 +119,7 @@ frontend: | $(BUILD_DIR)
 		echo "self-host mode: packing lang.json + hashed JS/CSS into the .tapp"; \
 		cp $(FRONTEND_DIST)/*.js $(FRONTEND_DIST)/*.css $(BUILD_DIR)/; \
 	fi
-	@cp VERSION.txt $(BUILD_DIR)/VERSION.txt
+	@cp ../../VERSION.txt $(BUILD_DIR)/VERSION.txt
 
 tapp: minify frontend
 	@echo "Building TAPP file: $(TAPP)"
@@ -170,8 +164,6 @@ test:
 		echo "Executing $$test_file..."; \
 		(cd $(TEST_DIR) && berry -m .. $$test_file) || exit 1; \
 	done
-	@echo "Executing vzev/test_vzev.be..."
-	@(cd $(TEST_DIR)/vzev && berry -m ../.. test_vzev.be) || exit 1
 	@echo "Executing netgate/test_net_gate.be..."
 	@(cd $(TEST_DIR)/netgate && berry -m ../.. test_net_gate.be) || exit 1
 	@echo "Executing battery/test_battery_site.be..."

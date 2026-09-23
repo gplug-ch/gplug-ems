@@ -4,8 +4,11 @@
 **Created:** 2026-07-28
 **Status:** Draft
 **Depends on:** `001-energy-data-and-storage`, `002-ui-shell-design-i18n`,
-`003-uebersicht-live-monitor`, `004-verlauf-history` (vZEV parts optional on `005`)
+`003-uebersicht-live-monitor`, `004-verlauf-history`
 (read `specs/README.md` for shared constraints, personas and the glossary)
+
+> **Issue #1 (2026-09-23).** The community variants (flow node, «inkl.» Autarkie, Saldo
+> component, former FR-807) were removed together with spec 005.
 
 ## Overview
 
@@ -37,15 +40,13 @@ touched at all (C-3). New pure module `src/lib/insights.js`, rendered into the e
 **Acceptance Scenarios**
 - **Given** live data (newest `/api/power` sample), **Then** a diagram shows nodes **PV**
   (blue), **Haus** (yellow), **Netz** (navy) — plus **Batterie** when a BATTERY production is
-  configured and **vZEV** when spec 005 is active — with directed edges labeled `fmtW`:
+  configured — with directed edges labeled `fmtW`:
   PV→Haus (Eigenverbrauch = pv − export), PV→Netz (Einspeisung), Netz→Haus (Bezug),
-  Batterie↔Haus (signed), vZEV edge splitting the Netz edge per 003 FR-305 semantics.
+  Batterie↔Haus (signed).
 - **Given** an edge's power is 0 (e.g. no export at night), **Then** the edge is dimmed/hidden
   rather than showing «0 W» arrows everywhere.
 - **Given** flows change on the next poll, **Then** edge labels/weights update in place; edge
   stroke width scales with power (min/max clamped) so «viel/wenig» is visible pre-attentively.
-- Visual language matches the vZEV graph page (spec 005) — same node/edge styling, so the
-  house-level and community-level diagrams read as one family.
 
 ### UC-802: Understand «wie unabhängig bin ich?»
 **Acceptance Scenarios**
@@ -55,9 +56,6 @@ touched at all (C-3). New pure module `src/lib/insights.js`, rendered into the e
   - Eigenverbrauchsgrad = (PV-Produktion − Einspeisung) / PV-Produktion
   each as % with a small donut/gauge and a `<Tooltip>` giving the plain-language definition
   («Anteil deines Verbrauchs, den deine eigene Produktion gedeckt hat»).
-- **Given** a vZEV (005 active), **Then** Autarkie additionally shows the variant «inkl. vZEV»
-  (Netzbezug reduced by `vzev_in_wh` — locally produced community power counts as local),
-  clearly labeled; the tooltip explains the difference.
 - **Given** PV-Produktion is 0 in the period (night, winter day), **Then** Eigenverbrauch shows
   «—» (not 0 %, not NaN); Autarkie likewise when Verbrauch is 0.
 
@@ -80,8 +78,8 @@ touched at all (C-3). New pure module `src/lib/insights.js`, rendered into the e
 ### UC-804: See what the PV yields in money and CO₂
 **Acceptance Scenarios**
 - **Given** tariffs configured (001), **Then** «Ersparnis» per period = existing
-  `saving_selfuse_chf` + `revenue_feedin_chf` (+ vZEV Saldo when 005 active), presented as one
-  headline CHF number with a tooltip breaking down the three components — *show the result,
+  `saving_selfuse_chf` + `revenue_feedin_chf`, presented as one
+  headline CHF number with a tooltip breaking down the components — *show the result,
   not the arithmetic*; the breakdown is one click away, never the default view.
 - **Given** a CO₂ factor is configured (`tariffs.co2_g_kwh`, default 128 g CO₂eq/kWh ≈ Schweizer
   Verbrauchermix, editable in Einstellungen → Tarife, 0 hides the stat), **Then** the KPI strip
@@ -91,12 +89,12 @@ touched at all (C-3). New pure module `src/lib/insights.js`, rendered into the e
 ## Functional Requirements
 
 - **FR-801** Flow diagram component `src/lib/… / src/pages/uebersicht.js` top panel per UC-801;
-  node set is data-driven (Batterie/vZEV nodes only when present); SVG, hand-rolled like
+  node set is data-driven (Batterie node only when present); SVG, hand-rolled like
   `charts.js` (C-2: no external libs).
 - **FR-802** Pure module `src/lib/insights.js` (no DOM, node-testable):
-  - `kpis(records, opts) → {autarky, autarkyVzev?, selfuse, savingChf, co2Kg}` from summed
+  - `kpis(records, opts) → {autarky, selfuse, savingChf, co2Kg}` from summed
     `/api/energy` records (glossary formulas; `null` where undefined per UC-802).
-  - `flowsNow(sample, vzev?) → edges[]` for the diagram (edge list with from/to/watts).
+  - `flowsNow(sample) → edges[]` for the diagram (edge list with from/to/watts).
   - `balance(records) → {prodSelf, prodFeedin, consSelf, consImport}` for the Bilanz bars.
   All integer-Wh in, display formatting stays in components.
 - **FR-803** KPI strip on Übersicht (period «Heute», refreshed with the existing poll cycle)
@@ -111,9 +109,7 @@ touched at all (C-3). New pure module `src/lib/insights.js`, rendered into the e
   served via existing `/api/meta` tariffs passthrough — **no new endpoint**.
 - **FR-806** Every KPI has an i18n label + tooltip (`kpi.*`, `tooltip.kpi_*`); definitions
   match the glossary (Autarkie, Eigenverbrauch join the glossary table).
-- **FR-807** vZEV-aware variants (UC-802 «inkl. vZEV», UC-804 Saldo component) render only
-  when 005 is present — with 005 absent, the page is fully functional with the base variants
-  (003 FR-310 pattern).
+- **FR-807** (removed with issue #1 — community-aware KPI variants.)
 
 ## Non-Functional Requirements
 
@@ -125,7 +121,7 @@ touched at all (C-3). New pure module `src/lib/insights.js`, rendered into the e
 
 ## Key Entities
 
-- **FlowEdge** — `{from, to, watts}`; **KpiSet** — `{autarky, autarkyVzev?, selfuse,
+- **FlowEdge** — `{from, to, watts}`; **KpiSet** — `{autarky, selfuse,
   savingChf, co2Kg}`; **BalanceSet** — the four Bilanz sums. All derived, never persisted.
 
 ## Edge Cases
@@ -150,7 +146,7 @@ touched at all (C-3). New pure module `src/lib/insights.js`, rendered into the e
 
 ## Existing Code — Extend, Don't Break
 
-- `uebersicht.js` gains the flow panel + KPI strip above the existing panels — the four 003
+- `uebersicht.js` gains the flow panel + KPI strip above the existing panels — the 003
   panels themselves stay untouched (C-1); `verlauf.js` gains the mode toggle + summary
   additions, existing table/CSV columns unchanged apart from the added derived columns.
 - `charts.js` `BarChart` extended backward-compatibly (existing call sites unchanged).
@@ -160,16 +156,15 @@ touched at all (C-3). New pure module `src/lib/insights.js`, rendered into the e
 ## Testing (required)
 
 - JS unit tests (node:test) for `insights.js`: KPI formulas incl. all UC-802/Edge-case
-  null/clamp rules; `flowsNow` edge derivation for producer/consumer/battery/vZEV fixtures;
+  null/clamp rules; `flowsNow` edge derivation for producer/consumer/battery fixtures;
   `balance` sums; gap handling (> 20 % rule).
-- Manual checklist: Übersicht with/without Batterie and vZEV fixtures; Verlauf Bilanz mode at
+- Manual checklist: Übersicht with/without Batterie fixtures; Verlauf Bilanz mode at
   all six resolutions; KPI «—» states (night fixture); 360/768/1440 px.
 
 ## Acceptance Checklist
 
-- [ ] Flow diagram shows live PV/Haus/Netz(+Batterie/vZEV) flows, dimmed zero-edges
+- [ ] Flow diagram shows live PV/Haus/Netz(+Batterie) flows, dimmed zero-edges
 - [ ] Autarkie & Eigenverbrauch on Übersicht (Heute) and Verlauf (selection), one formula source
-- [ ] «inkl. vZEV» variant only with 005; base UI fully functional without it
 - [ ] Bilanz chart mode with stacked production/consumption bars, labeled axes, CSV columns
 - [ ] Ersparnis headline with component breakdown tooltip; CO₂ stat driven by `co2_g_kwh`
 - [ ] All KPIs «—» on undefined/incomplete data — never NaN, never fake zeros

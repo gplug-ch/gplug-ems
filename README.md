@@ -1,19 +1,17 @@
-# vZEV System
+# gPlug EMS
 
-This **vZEV System** combines several **Energy Management Systems (EMS)** running locally on [gPlug devices](https://gplug.ch/) that distributes available renewable energy across **multiple physical sites** in a virtual energy community. Sites share a common grid connection point (GCP), are in the same LAN and the EMS intelligently routes surplus PV energy to loads before it is exported to the grid.
-
-![vZEV system diagram](vzev.svg)
+The **gPlug EMS** is an **Energy Management System** running locally on a [gPlug device](https://gplug.ch/) (ESP32 / Tasmota Berry). It routes the site's surplus PV energy to controllable loads before it is exported to the grid, and records raw 15-minute energy data that the browser UI turns into history and costs.
 
 ## System overview
 
-The system connects multiple **Sites** (buildings) under a single grid operator connection. Each site has:
+Each **site** (building) runs its own, standalone EMS. A site has:
 
 - A **Smartmeter** — measures grid import/export at the site
 - A **gPlug device** running **EMS** firmware — the local controller (ESP32 / Tasmota Berry)
 - **Loads** — controllable consumers
 - optional **Producers** — energy sources (PV panels, battery)
 
-A **Simulator** (highlighted in yellow in the diagram) runs alongside a site for testing and demonstration without physical devices.
+A **Simulator** (Spring Boot + React) can stand in for loads, PV and the smart meter for testing and demonstration without physical devices.
 
 ## Sites and loads
 
@@ -47,13 +45,13 @@ For each load in priority order:
 
 ## PV producer
 
-Each site can have zero, one or more PV systems. Surplus power is distributed to loads locally first, then into the vZEV; anything remaining is exported to the grid.
+Each site can have zero, one or more PV systems. Surplus power is distributed to the site's loads first; anything remaining is exported to the grid.
 
 ## Where computation happens
 
 The gPlug is an ESP32-C3 with a very small Berry heap, so the device does only
-what *must* run on hardware. Everything derived — roll-ups, money, the vZEV
-energy allocation — is computed in the browser from raw data the device serves.
+what *must* run on hardware. Everything derived — roll-ups and money —
+is computed in the browser from raw data the device serves.
 
 **On the device (`ems/backend/`):**
 
@@ -61,7 +59,7 @@ energy allocation — is computed in the browser from raw data the device serves
 | ----------- | ----- | ------------- |
 | Load allocation (priority sort, greedy activation, 200 W hysteresis, minimum runtime) | `ems.be` | Drives the relays; must run without a browser |
 | Energy integration — samples grid / PV / active loads every 10 s, accumulates `W × dt / 3600` into Wh, seals a record at each 15-min boundary | `meter.be` | Needs continuous sampling |
-| Raw record storage — delta encoding, per-day bucket files, retention pruning (30 days own slots, 14 days vZEV peer slots) | `store.be`, `vzev.be` | Local persistence; every write is an append, files are never rewritten |
+| Raw record storage — delta encoding, per-day bucket files, retention pruning (30 days) | `store.be` | Local persistence; every write is an append, files are never rewritten |
 | Unit conversion of integration readings (kW → W) | `integrations/` | Normalises vendor data at the source |
 
 **In the browser (`ems/frontend/`):**
@@ -69,16 +67,13 @@ energy allocation — is computed in the browser from raw data the device serves
 | Computation | Where |
 | ----------- | ----- |
 | Day / month roll-ups, energy costs in CHF | `src/lib/aggregate.js` |
-| vZEV per-slot allocation, flow bucketing, quarterly billing | `src/lib/vzev.js` |
 | History archive in IndexedDB, incremental sync, gap detection, CSV export/import | `src/lib/archive.js` |
 | Smart-meter labelling, grouping and derived values | `src/lib/metercat.js` |
 | All `site.json` configuration validation | `src/pages/einstellungen.js` |
 
 The device APIs are correspondingly plain: `GET /api/energy?res=15m` streams raw
-Wh records, `GET /api/vzev/raw` streams the producer id, the community tariffs
-and every member's raw `ts,imp,exp` triples, and `GET /api/meter` returns the
-Tasmota smart-meter sensor object verbatim. None of them compute a total, a
-share or a price.
+Wh records and `GET /api/meter` returns the
+Tasmota smart-meter sensor object verbatim. Neither computes a total or a price.
 
 ## Repository components
 
@@ -90,7 +85,3 @@ share or a price.
 | **Simulator frontend** | `simulator/frontend/` | React 19 + Vite UI for controlling the simulator                                          |
 
 See the `CLAUDE.md` files in each component directory for commands and detailed architecture.
-
-## Grid connection
-
-All sites connect through a shared **Netzverknüpfungspunkt /NVP (GCP)** managed by the grid operator (**Verteilnetzbetreiber / VNB (DSO)**). The EMS coordinates across sites via UDP multicast so that the combined community behaves as a single energy-sharing unit.

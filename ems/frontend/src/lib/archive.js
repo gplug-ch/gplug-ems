@@ -1,12 +1,12 @@
 /* Browser-side archive of the device's RAW series (spec 011 FR-1101…FR-1111).
 
-   The gPlug keeps only a short append-only buffer (KEEP_DAYS 15-min slots,
-   VZ_KEEP_DAYS peer slots). The browser has persistent storage and is the only
-   place that needs the long history, so it mirrors every record it has ever
-   seen into IndexedDB and derives day/month roll-ups, the vZEV share, costs and
-   quarterly billing from its own copy (lib/aggregate.js, lib/vzev.js).
+   The gPlug keeps only a short append-only buffer (KEEP_DAYS of 15-min
+   slots). The browser has persistent storage and is the only place that needs
+   the long history, so it mirrors every record it has ever seen into IndexedDB
+   and derives day/month roll-ups and costs from its own copy
+   (lib/aggregate.js).
 
-   Stored are RAW integer Wh only — never a cost, a roll-up or an allocation
+   Stored are RAW integer Wh only — never a cost or a roll-up
    (spec 001 «costs are never stored», extended to every derived series).
    `localStorage` is deliberately not used: string-only, ~5 MB, synchronous.
 
@@ -16,13 +16,14 @@
 import { build as csvBuild, parse as csvParse } from './csv.js';
 
 var DB_NAME = 'gplug-archive';
-var DB_VERSION = 2;
+var DB_VERSION = 3;
 var SLOT = 900;                 /* 15 min, the device's slot length */
 var PAGE = 384;                 /* records per /api/energy request (NFR-1104) */
 var MAX_PAGES = 60;             /* safety stop: 60 * 384 = 23 040 slots */
 var REFETCH_S = 2 * 86400;      /* first sync of a session re-reads 2 days */
 var MAX_GAPS = 50;              /* gap runs kept in meta (display only) */
-var EXPORT_FORMAT = '2';        /* 2: `e` rows carry bat_chg/bat_dis (issue #20) */
+var EXPORT_FORMAT = '2';        /* 2: `e` rows carry bat_chg/bat_dis (issue #20);
+                                   older files' `v` peer rows are ignored */
 var IMPORT_FORMATS = ['1', '2'];
 
 /* per-session state: which sites this page load has already re-fetched, and
@@ -70,8 +71,9 @@ function open() {
       if (!db.objectStoreNames.contains('e15')) {
         db.createObjectStore('e15', { keyPath: ['siteId', 'ts'] });
       }
-      if (!db.objectStoreNames.contains('vz15')) {
-        db.createObjectStore('vz15', { keyPath: ['siteId', 'memberId', 'ts'] });
+      /* v3: the former community peer-slot store is gone (issue #1) */
+      if (db.objectStoreNames.contains('vz15')) {
+        db.deleteObjectStore('vz15');
       }
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'siteId' });
@@ -109,9 +111,8 @@ function store(db, name, mode) {
 
 function blankMeta(siteId) {
   return {
-    siteId: siteId, firstE15Ts: null, lastE15Ts: null, lastVzTs: null,
-    gaps: [], count: 0, syncedAt: null,
-    producerId: null, selfId: null, tariffs: null
+    siteId: siteId, firstE15Ts: null, lastE15Ts: null,
+    gaps: [], count: 0, syncedAt: null
   };
 }
 
@@ -198,66 +199,6 @@ function putBattery(dst, src) {
   });
 }
 
-/* --- peer slots ---------------------------------------------------------- */
-
-/* putRaw(siteId, raw) — mirror a /api/vzev/raw response into `vz15`. Each
-   member ring is a flat [ts,imp,exp, …] stream that MAY contain more than one
-   triple for the same ts (the device appends corrections); iterating in array
-   order makes the LAST one win, exactly as lib/vzev.js peerSlot() does. */
-function putRaw(siteId, raw) {
-  var data = (raw && raw.data) || {};
-  var ids = Object.keys(data);
-  if (!ids.length) return Promise.resolve(0);
-  return open().then(function (db) {
-    var tx = db.transaction('vz15', 'readwrite');
-    var os = tx.objectStore('vz15');
-    var n = 0;
-    ids.forEach(function (id) {
-      var ring = data[id];
-      if (!Array.isArray(ring)) return;
-      for (var i = 0; i + 2 < ring.length; i += 3) {
-        os.put({ siteId: siteId, memberId: id, ts: ring[i],
-                 imp: ring[i + 1], exp: ring[i + 2] });
-        n++;
-      }
-    });
-    return txDone(tx).then(function () { return n; });
-  });
-}
-
-/* rawRange(siteId, from, to) — rebuild a /api/vzev/raw-shaped object from the
-   archive so lib/vzev.js (flows15m / quality / buildBilling) runs unchanged
-   over an arbitrary period instead of the device's short buffer (FR-1105). */
-function rawRange(siteId, from, to) {
-  return Promise.all([
-    getMeta(siteId),
-    open().then(function (db) {
-      return req(store(db, 'vz15', 'readonly').getAll(
-        IDBKeyRange.bound([siteId, '', from === undefined || from === null ? 0 : from],
-                          [siteId, '￿', to === undefined || to === null ? 9999999999 : to])));
-    })
-  ]).then(function (res) {
-    var meta = res[0];
-    var rows = res[1] || [];
-    var lo = (from === undefined || from === null) ? 0 : from;
-    var hi = (to === undefined || to === null) ? 9999999999 : to;
-    var data = {};
-    rows.sort(function (a, b) {
-      return a.memberId === b.memberId ? a.ts - b.ts : (a.memberId < b.memberId ? -1 : 1);
-    });
-    rows.forEach(function (r) {
-      if (r.ts < lo || r.ts > hi) return;     /* memberId-major key range is coarse */
-      var ring = data[r.memberId];
-      if (!ring) { ring = []; data[r.memberId] = ring; }
-      ring.push(r.ts, r.imp, r.exp);
-    });
-    return {
-      producer_id: meta.producerId, self_id: meta.selfId,
-      tariffs: meta.tariffs, data: data
-    };
-  });
-}
-
 /* --- coverage & gaps ----------------------------------------------------- */
 
 /* gapsOf(tsList) — runs of missing 15-min slots between the first and the last
@@ -299,7 +240,7 @@ function coverage(siteId) {
         siteId: siteId,
         firstE15Ts: sc.firstE15Ts, lastE15Ts: sc.lastE15Ts,
         count: sc.count, gaps: sc.gaps,
-        lastVzTs: meta.lastVzTs, syncedAt: meta.syncedAt,
+        syncedAt: meta.syncedAt,
         days: sc.firstE15Ts === null ? 0
           : Math.max(1, Math.round((sc.lastE15Ts - sc.firstE15Ts) / 86400)),
         estimate: r[2]
@@ -346,17 +287,6 @@ function sync(api, siteId) {
     sessionSynced[siteId] = true;
     return pullEnergy(api, siteId, from);
   }).then(function () {
-    return api.getVzevRaw ? api.getVzevRaw().catch(function () { return null; })
-      : Promise.resolve(null);
-  }).then(function (raw) {
-    if (!raw || !raw.data) return null;
-    if (raw.producer_id !== undefined) meta.producerId = raw.producer_id;
-    if (raw.self_id !== undefined) meta.selfId = raw.self_id;
-    if (raw.tariffs) meta.tariffs = raw.tariffs;
-    return putRaw(siteId, raw).then(function () {
-      meta.lastVzTs = newestRawTs(raw);
-    });
-  }).then(function () {
     return scan(siteId);
   }).then(function (sc) {
     /* concurrent tabs: keep the larger lastE15Ts (spec edge case) */
@@ -391,18 +321,6 @@ function pullEnergy(api, siteId, from) {
   return step(from);
 }
 
-function newestRawTs(raw) {
-  var data = (raw && raw.data) || {};
-  var newest = null;
-  Object.keys(data).forEach(function (id) {
-    var ring = data[id];
-    if (!Array.isArray(ring)) return;
-    for (var i = 0; i + 2 < ring.length; i += 3) {
-      if (newest === null || ring[i] > newest) newest = ring[i];
-    }
-  });
-  return newest;
-}
 
 
 /* --- live power rings (Uebersicht sparklines) -----------------------------
@@ -467,24 +385,15 @@ function getLive(siteId, kind, from) {
 
 /* exportText(siteId) — the whole archive as one CSV. Row 1 identifies the
    archive (format version + site id) so an import can refuse a foreign file;
-   `e` rows are 15-min records, `v` rows peer slots. */
+   `e` rows are 15-min records. */
 function exportText(siteId) {
-  return Promise.all([
-    open().then(function (db) { return req(store(db, 'e15', 'readonly').getAll(boundRange(siteId))); }),
-    open().then(function (db) {
-      return req(store(db, 'vz15', 'readonly').getAll(
-        IDBKeyRange.bound([siteId, '', 0], [siteId, '￿', 9999999999])));
-    })
-  ]).then(function (res) {
+  return open().then(function (db) {
+    return req(store(db, 'e15', 'readonly').getAll(boundRange(siteId)));
+  }).then(function (recs) {
     var rows = [];
-    (res[0] || []).sort(function (a, b) { return a.ts - b.ts; }).forEach(function (r) {
+    (recs || []).sort(function (a, b) { return a.ts - b.ts; }).forEach(function (r) {
       rows.push(['e', r.ts, blank(r.imp_wh), blank(r.exp_wh), blank(r.pv_wh),
                  r.partial ? '1' : '0', blank(r.bat_chg_wh), blank(r.bat_dis_wh)]);
-    });
-    (res[1] || []).sort(function (a, b) {
-      return a.memberId === b.memberId ? a.ts - b.ts : (a.memberId < b.memberId ? -1 : 1);
-    }).forEach(function (r) {
-      rows.push(['v', r.ts, r.memberId, blank(r.imp), blank(r.exp), '']);
     });
     return csvBuild([DB_NAME, EXPORT_FORMAT, siteId], rows);
   });
@@ -507,7 +416,7 @@ function importText(text, siteId) {
     return Promise.reject(new Error('site mismatch: file ' + fileSite + ', device ' + siteId));
   }
   var target = siteId || fileSite;
-  var energy = [], peers = {};
+  var energy = [];
   for (var i = 1; i < rows.length; i++) {
     var r = rows[i];
     if (!r || !r.length) continue;
@@ -517,14 +426,9 @@ function importText(text, siteId) {
       if (r[5] === '1') rec.partial = true;
       putBattery(rec, { bat_chg_wh: numOrNull(r[6]), bat_dis_wh: numOrNull(r[7]) });
       energy.push(rec);
-    } else if (r[0] === 'v') {
-      var id = r[2];
-      if (!peers[id]) peers[id] = [];
-      peers[id].push(Number(r[1]), numOrZero(r[3]), numOrZero(r[4]));
     }
   }
   return putEnergy(target, energy)
-    .then(function () { return putRaw(target, { data: peers }); })
     .then(function () { return scan(target); })
     .then(function (sc) {
       return getMeta(target).then(function (meta) {
@@ -539,15 +443,12 @@ function importText(text, siteId) {
 }
 
 function numOrNull(v) { return (v === '' || v === undefined) ? null : Number(v); }
-function numOrZero(v) { return (v === '' || v === undefined) ? 0 : Number(v); }
 
 /* clearSite(siteId) — drop one archive (a renamed site, or freeing space). */
 function clearSite(siteId) {
   return open().then(function (db) {
-    var tx = db.transaction(['e15', 'vz15', 'meta', 'live'], 'readwrite');
+    var tx = db.transaction(['e15', 'meta', 'live'], 'readwrite');
     tx.objectStore('e15').delete(boundRange(siteId));
-    tx.objectStore('vz15').delete(
-      IDBKeyRange.bound([siteId, '', 0], [siteId, '￿', 9999999999]));
     tx.objectStore('meta').delete(siteId);
     tx.objectStore('live').delete(liveRange(siteId));
     return txDone(tx);
@@ -557,7 +458,7 @@ function clearSite(siteId) {
 /* --- page glue ------------------------------------------------------------
    Everything below is the impure half: it owns the site id, the boot sync and
    the 15-min re-sync, and lets pages subscribe to coverage changes. Pure
-   consumers (aggregate.js, vzev.js, insights.js) never see it. */
+   consumers (aggregate.js, insights.js) never see it. */
 
 var RESYNC_MS = 15 * 60 * 1000;
 var st = { available: null, siteId: null, coverage: null, error: null, syncing: false,
@@ -641,9 +542,9 @@ function ready() {
 function refresh(api) { return runSync(api); }
 
 export {
-  available, open, sync, range, rawRange, coverage, listSites,
+  available, open, sync, range, coverage, listSites,
   start, ready, refresh, state, onChange,
-  exportText, importText, clearSite, putEnergy, putRaw, getMeta,
+  exportText, importText, clearSite, putEnergy, getMeta,
   putLive, getLive,
   DB_NAME, DB_VERSION, SLOT, PAGE, EXPORT_FORMAT
 };

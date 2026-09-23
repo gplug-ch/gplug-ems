@@ -1,4 +1,4 @@
-# Tests for fsx.be — the bucket-file helpers shared by store.be and vzev.be
+# Tests for fsx.be — the bucket-file helpers used by store.be
 # (issue #9).
 #
 # Run from the backend/ directory:

@@ -56,7 +56,7 @@ def _get_site()
     return _s['site']
 end
 
-# path injection so tests can point at a temp file (mirrors vzev.set_file)
+# path injection so tests can point at a temp file
 def set_file(p)
     _s['file'] = p
     _s['file_new'] = p + '.new'

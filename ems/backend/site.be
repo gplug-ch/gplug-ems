@@ -14,9 +14,7 @@ var STATE_ACTIVE   = 'ACTIVE'
 var TARIFF_DEFAULTS = {
     'grid_import_chf_kwh': 0.26,
     'grid_feedin_chf_kwh': 0.18,
-    'base_fee_chf_month': 12.5,
-    'vzev_export_chf_kwh': 0.22,
-    'vzev_import_chf_kwh': 0.22
+    'base_fee_chf_month': 12.5
 }
 
 # name -> module registry. Filled at BOOT by main.be's _load_integrations()
@@ -37,7 +35,6 @@ var _s = {
     'site': nil,
     'grid': [],
     'grid_config': [],
-    'messaging': {},
     'tariffs': {},
     # --- outbound-HTTP scheduler (NFR: single Berry heap on ESP32-C3) --------
     # Every outbound webclient() call (integration read AND relay write) is the
@@ -363,7 +360,6 @@ def load_config()
         _s['loads'] = _fetch_items(config.find("loads", []), "Load")
         _s['productions'] = _fetch_items(config.find("productions", []), "Production")
         _s['grid_config'] = config.find("grid", [])
-        _s['messaging'] = config.find("messaging", {})
         _s['tariffs'] = config.find("tariffs", {})
         # optional dev meter source (see 'meter_cfg' declaration); reset the
         # cache so a reload cannot serve a stale descriptor
@@ -396,10 +392,6 @@ end
 
 def get_site()
     return _s['site']
-end
-
-def get_messaging_udp()
-    return _s['messaging'].find("udp", nil)
 end
 
 # configured tariffs merged over defaults (spec 001 FR-107)
@@ -487,7 +479,6 @@ site.get_load_by_id        = get_load_by_id
 site.set_load_state        = set_load_state
 site.get_productions       = get_productions
 site.get_site              = get_site
-site.get_messaging_udp     = get_messaging_udp
 site.get_grid_cached       = get_grid_cached
 site.get_meter_cached      = get_meter_cached
 site.get_modbus_cached     = get_modbus_cached

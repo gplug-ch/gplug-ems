@@ -2,7 +2,7 @@
 
    Regression guard for the spurious «Verbindung zum gPlug verloren» toast:
    the old get() flipped offline on ANY rejected fetch, so a 404 from an
-   optional /api/vzev/* route (polled every 10s by the Übersicht) or a single
+   optional route (polled every 10s by the Übersicht) or a single
    aborted request under load raised the toast on a perfectly healthy device. */
 import test from 'node:test';
 import assert from 'node:assert';
@@ -38,7 +38,7 @@ test('an HTTP error is not a lost connection (device answered)', async () => {
   const events = await withStatus(async () => {
     responder = async () => status(404);
     for (let i = 0; i < 5; i++) {
-      await assert.rejects(api.get('/api/vzev/members'));
+      await assert.rejects(api.get('/api/meter'));
     }
   });
   assert.deepStrictEqual(events, []);
@@ -80,10 +80,8 @@ test('optional reads never drive the connection status', async () => {
   const events = await withStatus(async () => {
     responder = transportFail;
     for (let i = 0; i < 10; i++) {
-      await assert.rejects(api.getVzevRaw());
-      await assert.rejects(api.getVzevMembersList());
+      await assert.rejects(api.get('/api/meter', { optional: true }));
     }
-    await api.getVzevInfo();           /* swallows its own error -> {} */
   });
   assert.deepStrictEqual(events, []);
   assert.strictEqual(api.isOnline(), true);
@@ -102,7 +100,7 @@ test('requests are capped at 2 in flight (single-threaded device)', async () => 
   };
   const all = Promise.all([
     api.get('/api/power'), api.get('/loads'), api.get('/productions'),
-    api.get('/api/vzev/members', { optional: true }), api.getVzevRaw()
+    api.get('/api/meter', { optional: true }), api.getModbus()
   ].map((p) => p.catch(() => null)));
 
   /* drain: each release lets the queue dispatch the next one */

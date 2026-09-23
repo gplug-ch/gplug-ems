@@ -20,12 +20,16 @@
 > the visible history; that fallback disappears with spec 011 step 3b). A coverage badge shows how many days the archive
 > holds; a period touching a gap is marked «provisorisch». Without a usable archive
 > the page falls back to the device rings exactly as before.
+>
+> **Issue #1 (2026-09-23).** The community columns (Export/Import to members, per-member
+> breakdown, community Saldo) were removed together with spec 005; the table and chart
+> show only the site's own grid, PV, battery and cost columns.
 
 ## Overview
 
 Route `#/verlauf`. Tabular history of energy amounts and their costs, per resolution, with CSV
-export — the "billing view" of the site. Figma frames `22:182` (producer / vZEV-Export variant)
-and `33:486` (consumer / vZEV-Import variant); one implementation, data-driven columns.
+export — the "billing view" of the site. Figma frames `22:182` (producer variant)
+and `33:486` (consumer variant); one implementation, data-driven columns.
 
 Data source: `GET /api/energy` (spec 001). Native resolutions are 15 min (60 h), 1 day
 (4 months), 1 month (18 months); coarser resolutions (Stunden, Wochen, Quartale) are aggregated
@@ -36,18 +40,13 @@ client-side from the finest ring that covers the requested range.
 ### UC-401: Review recent energy and costs
 **Actor:** Resident
 **Flow:** Opens Verlauf, sees a paginated table (newest first): Zeitpunkt, Netzbezug,
-Netzbezug-Kosten, vZEV Export (producer) or vZEV Import (consumer), vZEV Saldo, Eigenverbrauch
-(gespart).
+Netzbezug-Kosten, Netzeinspeisung (producer), Eigenverbrauch (gespart).
 
 **Acceptance Scenarios**
 - **Given** 15 min resolution, **Then** rows show `24.05.2026 17:15`-style timestamps and
   quantities as plain numbers — **units appear only in the column headers** («Netzbezug [kWh]»,
-  «Saldo [CHF]») (review feedback + brain dump).
-- **Given** a row with positive vZEV Saldo, **Then** the CHF value renders green with `+`;
-  negative renders red with `−` (matches Figma).
-- **Given** the producer site, **Then** the vZEV Export cell shows the total and an indented
-  per-member breakdown (e.g. «0.87 Familie Müller / 0.41 Peter Schneider», from spec 005 data;
-  without 005 the breakdown line is omitted).
+  «Netzbezug Kosten [CHF]») (review feedback + brain dump).
+- (Former signed-Saldo and per-member breakdown scenarios removed with issue #1.)
 
 ### UC-402: Change resolution
 **Acceptance Scenarios**
@@ -66,11 +65,11 @@ Netzbezug-Kosten, vZEV Export (producer) or vZEV Import (consumer), vZEV Saldo, 
 ### UC-404: Spot patterns & anomalies
 **Acceptance Scenarios**
 - **Given** a resolution is selected, **Then** above the table a `<BarChart>` (002 FR-211,
-  0-axis anchored) shows the table's quantities over time — Netzbezug red bars vs. vZEV/Export
+  0-axis anchored) shows the table's quantities over time — Netzbezug red bars vs. Export
   green bars — sharing the table's data (brain dump "Chart 0-Achse und mit Balkendiagramm";
   optional toggle «nur CHF» renders the saldo series in CHF instead).
   *Amended by issue #17:* the bars follow the app-wide sign convention — what the site gives
-  (Einspeisung/vZEV-Abgabe, green) sits above the 0-axis, what it takes (Netzbezug, red) below
+  (Einspeisung, green) sits above the 0-axis, what it takes (Netzbezug, red) below
   it. Netzbezug was drawn upward before, mirrored against the Bilanz mode and the CHF saldo.
 - **Given** daily resolution and ≥ 8 days of data, **Then** a summary strip shows: Durchschnitt
   pro Tag, Trend (▲/▼ vs. previous equal-length period), and — if ≥ 13 months of monthly data —
@@ -103,8 +102,6 @@ Netzbezug-Kosten, vZEV Export (producer) or vZEV Import (consumer), vZEV Saldo, 
   | Netzbezug [kWh] | ✓ | ✓ |
   | Netzbezug Kosten [CHF] (red) | ✓ | ✓ |
   | Netzeinspeisung [kWh] | ✓ (if any `exp_wh>0`) | hidden if always 0 |
-  | vZEV Export/Import [kWh] (+ member breakdown) | Export | Import |
-  | vZEV Saldo [CHF] (signed, colored) | ✓ | ✓ |
   | Eigenverbrauch gespart [CHF] (green) | ✓ (PV sites) | hidden |
   Producer/consumer detection is data-driven: site has productions ⇒ producer columns.
 - **FR-405** The chart above the table has labeled axes with dimensions (002 FR-211), x-ticks
@@ -127,8 +124,8 @@ Netzbezug-Kosten, vZEV Export (producer) or vZEV Import (consumer), vZEV Saldo, 
 
 ## Edge Cases
 
-- Holiday / pure-export week (review feedback): Netzbezug 0.00 rows with positive Saldo — the
-  colors must make this a *good* state (green saldo), covered by a fixture in tests.
+- Holiday / pure-export week (review feedback): Netzbezug 0.00 rows with only Einspeisung — the
+  colors must make this a *good* state (green export), covered by a fixture in tests.
 - Tariff change mid-history: costs are computed with **current** tariffs; a footnote under the
   table states this (`history.tariff_note`). Per-slot historical tariffs are out of scope.
 - `count` < requested (young device) → table just shorter, no padding rows.
@@ -136,8 +133,7 @@ Netzbezug-Kosten, vZEV Export (producer) or vZEV Import (consumer), vZEV Saldo, 
 
 ## Out of Scope
 
-- Editing anything; per-phase data; historical tariff versioning; comparing individual members
-  (privacy — see 005 FR-509).
+- Editing anything; per-phase data; historical tariff versioning.
 
 ## Existing Code — Extend, Don't Break
 
@@ -156,6 +152,6 @@ Netzbezug-Kosten, vZEV Export (producer) or vZEV Import (consumer), vZEV Saldo, 
 - [ ] Matches Figma `22:182`/`33:486` structure with corrected unit handling & boundary rows
 - [ ] Resolution select covers 15min…Quartale with correct row counts
 - [ ] CSV downloads full range with i18n+unit headers
-- [ ] Saldo coloring (green +, red −), savings column on producer
+- [ ] CHF coloring (green gains, red costs), savings column on producer
 - [ ] Summary strip + peak markers unit-tested
 - [ ] Bar chart anchored at 0-axis, labeled axes

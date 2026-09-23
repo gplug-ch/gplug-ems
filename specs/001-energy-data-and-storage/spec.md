@@ -21,14 +21,18 @@
 > browser (`ems/frontend/src/lib/archive.js` + `lib/aggregate.js`).
 >
 > **Spec 011 step 3b (2026-09-05, v1.0.13).** The device-side roll-ups are **gone**:
-> `/e1d`, `/e1mo`, the running day/month accumulators, `store.set_vzev()` and the
-> `.tmp` line-wise rewrite were deleted, so FR-104 (roll-ups) and the `set_vzev`
-> half of FR-106 are now fulfilled by the browser archive, not the device.
-> `GET /api/energy` accepts `res=15m` only (400 otherwise) and its records carry
-> no `vzev_in_wh`/`vzev_out_wh`. Writes are append-only (FR-105 strengthened);
-> only the 15-min flash ring of the three specified here survives. Buckets written
-> by an older firmware still load — their 6-field lines parse with the vZEV tail
-> ignored — and `/e1d`/`/e1mo` are removed once at the first boot.
+> `/e1d`, `/e1mo`, the running day/month accumulators and the `.tmp` line-wise
+> rewrite were deleted, so FR-104 (roll-ups) is now fulfilled by the browser
+> archive, not the device. `GET /api/energy` accepts `res=15m` only (400 otherwise).
+> Writes are append-only (FR-105 strengthened); only the 15-min flash ring of the
+> three specified here survives. Buckets written by an older firmware still load —
+> their legacy 6-field lines parse with the two trailing fields ignored — and
+> `/e1d`/`/e1mo` are removed once at the first boot.
+>
+> **Issue #1 (2026-09-23).** The virtual energy community was removed: records carry
+> only `[ts, imp_wh, exp_wh, pv_wh]` (+ battery fields, spec 012), the community
+> tariffs and cost fields are gone, and so is the store's community write-back API. The text
+> below is updated accordingly.
 
 ## Overview
 
@@ -65,8 +69,8 @@ this spec supersedes them.
 - **Given** the device rebooted 1 min ago, **When** the UI requests `/api/power`,
   **Then** it receives only the ~6 samples collected since boot (no fabricated data).
 
-### UC-102: Energy history for Verlauf & Abrechnung
-**Actor:** Frontend (Verlauf, Abrechnung), vZEV peers
+### UC-102: Energy history for Verlauf
+**Actor:** Frontend (Verlauf, KPIs)
 **Flow:** The frontend requests `GET /api/energy?res=15m|1d|1mo&count=N` and receives energy
 records with Wh quantities and computed CHF costs.
 
@@ -123,8 +127,7 @@ current (unfinished) 15-min slot is lost.
   | `15m` | 15 min | **240** | 60 h |
   | `1d` | 1 day (UTC) | **124** | ≈ 4 months |
   | `1mo` | 1 calendar month | **18** | 18 months |
-  Record shape: `[ts, imp_wh, exp_wh, pv_wh, vzev_in_wh, vzev_out_wh]` (integers; `null` where
-  unknown; the two vZEV fields default `0` and are written by spec 005).
+  Record shape: `[ts, imp_wh, exp_wh, pv_wh]` (integers; `null` where unknown).
 - **FR-104** Daily and monthly records are **rolled up on the device**: when a 15-min slot closes,
   the store adds it to the running day record; at day/month boundaries the day/month record is
   sealed into its ring. On boot, the current day/month record is rebuilt from the `15m` ring so a
@@ -138,9 +141,8 @@ current (unfinished) 15-min slot is lost.
   - `GET /api/power` → `{"now":<utc>,"samples":[[ts,grid_w,pv_w,bat_w,load_w],…]}` (≤ 90, newest
     last).
   - `GET /api/energy?res=15m|1d|1mo&count=N[&from=<ts>&to=<ts>]` → array of records (newest last):
-    `{"ts":…,"imp_wh":…,"exp_wh":…,"pv_wh":…,"vzev_in_wh":…,"vzev_out_wh":…,"partial":bool?,`
-    `"cost_import_chf":…,"revenue_feedin_chf":…,"cost_vzev_chf":…,"revenue_vzev_chf":…,`
-    `"saving_selfuse_chf":…}`
+    `{"ts":…,"imp_wh":…,"exp_wh":…,"pv_wh":…,"partial":bool?,`
+    `"cost_import_chf":…,"revenue_feedin_chf":…,"saving_selfuse_chf":…}`
     Defaults: `res=15m`, `count=96`. `count` capped at ring capacity. Invalid `res` → HTTP 400
     `{"error":"invalid res"}`.
   - `GET /api/meta` → `{"version":"<VERSION.txt>","language":"de","time":<utc>,"tariffs":{…}}`.
@@ -150,18 +152,14 @@ current (unfinished) 15-min slot is lost.
   "tariffs": {
     "grid_import_chf_kwh": 0.26,
     "grid_feedin_chf_kwh": 0.18,
-    "base_fee_chf_month": 12.5,
-    "vzev_export_chf_kwh": 0.22,
-    "vzev_import_chf_kwh": 0.22
+    "base_fee_chf_month": 12.5
   }
   ```
   `site.be` gains `site.get_tariffs()` returning this map merged over defaults. **Existing
   `site.json` files without the key must keep loading unchanged.**
 - **FR-108** Cost computation (read time, in `apiservice.be`):
-  - `cost_import_chf   = (imp_wh − vzev_in_wh)/1000 × grid_import_chf_kwh`
-  - `revenue_feedin_chf= (exp_wh − vzev_out_wh)/1000 × grid_feedin_chf_kwh`
-  - `cost_vzev_chf     = vzev_in_wh/1000 × vzev_import_chf_kwh`
-  - `revenue_vzev_chf  = vzev_out_wh/1000 × vzev_export_chf_kwh`
+  - `cost_import_chf   = imp_wh/1000 × grid_import_chf_kwh`
+  - `revenue_feedin_chf= exp_wh/1000 × grid_feedin_chf_kwh`
   - `saving_selfuse_chf= (pv_wh − exp_wh)/1000 × (grid_import_chf_kwh − grid_feedin_chf_kwh)`,
     floored at 0 (answers feedback "Eigenverbrauch in CHF").
   All rounded to 2 decimals. `null` quantities → cost fields `null`.
@@ -186,7 +184,7 @@ current (unfinished) 15-min slot is lost.
 ## Key Entities
 
 - **PowerSample** `[ts, grid_w, pv_w, bat_w, load_w]` — RAM only.
-- **EnergyRecord** `[ts, imp_wh, exp_wh, pv_wh, vzev_in_wh, vzev_out_wh]` — flash rings.
+- **EnergyRecord** `[ts, imp_wh, exp_wh, pv_wh]` — flash rings.
 - **Tariffs** — see FR-107.
 
 ## Edge Cases
@@ -202,9 +200,6 @@ current (unfinished) 15-min slot is lost.
 
 ## Out of Scope
 
-- vZEV allocation and peer exchange (spec 005 — it *writes* `vzev_in_wh`/`vzev_out_wh` via a
-  store API `store.set_vzev(ts, in_wh, out_wh)` that this spec must provide as a stub updating
-  the 15m record and its roll-ups).
 - Any UI (specs 002–004).
 - Per-phase load values ("Last zwischen den Phasen") — future work.
 
@@ -225,7 +220,7 @@ Berry CLI tests under `tests/`, run with `cd tests && berry -m .. test_store.be`
 existing `tests/tasmota.be` stub (extend the stub with `rtc()` if missing):
 
 - `test_store.be`: push > capacity records → oldest evicted; save/load round-trip via a temp
-  file; day/month roll-up correctness incl. rebuild-on-boot; `set_vzev` updates 15m + roll-ups.
+  file; day/month roll-up correctness incl. rebuild-on-boot.
 - `test_meter.be`: feed synthetic samples across a quarter-hour boundary → correct Wh integration
   (e.g. constant 600 W for 15 min → 150 Wh); signed grid split into imp/exp; partial-null
   behaviour when a sensor value is `nil`.

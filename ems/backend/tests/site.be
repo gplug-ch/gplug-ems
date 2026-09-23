@@ -18,9 +18,7 @@ class SiteStub
     static TARIFF_DEFAULTS = {
         'grid_import_chf_kwh': 0.26,
         'grid_feedin_chf_kwh': 0.18,
-        'base_fee_chf_month': 12.5,
-        'vzev_export_chf_kwh': 0.22,
-        'vzev_import_chf_kwh': 0.22
+        'base_fee_chf_month': 12.5
     }
 
     var loads

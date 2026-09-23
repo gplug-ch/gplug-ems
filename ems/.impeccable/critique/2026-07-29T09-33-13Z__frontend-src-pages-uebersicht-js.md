@@ -21,7 +21,7 @@ Method: dual-agent (A: design-review · B: detector+browser)
 | 5 | Error Prevention | 3 | Excellent: null never coerced to 0, KPIs null out past 20% data holes, unknown≠zero edges. |
 | 6 | Recognition Rather Than Recall | 2 | 3-series Netzanschluss chart has no legend; flow diagram has no colour legend — user must recall gelb/blau/grün/rot or hover (pointer-only). |
 | 7 | Flexibility and Efficiency | 3 | Jetzt/Heute toggle + hover readouts; adequate for a monitor surface. |
-| 8 | Aesthetic and Minimalist Design | 2 | Flagship stacks ~8 analytic regions (flow + status + 2 comp bars + 4 KPI + Netz chart + per-production/load/member charts) — past "calm density." |
+| 8 | Aesthetic and Minimalist Design | 2 | Flagship stacks ~8 analytic regions (flow + status + 2 comp bars + 4 KPI + Netz chart + per-production/load charts) — past "calm density." |
 | 9 | Error Recovery | 3 | "Keine Live-Daten … Integration/Erreichbarkeit prüfen", offline toast, comp_nodata — genuinely diagnostic copy. |
 | 10 | Help and Documentation | 3 | Tooltips explain every term; Ersparnis arithmetic one click away. |
 | **Total** | | **28/40** | **Good** |
@@ -62,7 +62,7 @@ This is a trustworthy, well-engineered instrument that is quietly excellent at *
 
 **[P2] Grid line is red-filled even during export.** `GridPanel` passes `fill: 'var(--c-import-fill)'` unconditionally (`uebersicht.js:164-166`) despite a comment promising "green-filled when exporting." Feed-in periods paint under the cost/rot colour.
 - *Why it matters:* red = Netzbezug = money out; showing solar export in red inverts the good news and contradicts the Swiss convention the flow diagram honours correctly.
-- *Fix:* split the series at the zero crossing, or drive fill from sign (`--c-vzev-fill` when negative), mirroring `flowsNow`.
+- *Fix:* split the series at the zero crossing, or drive fill from sign (the pale green feed-in fill when negative), mirroring `flowsNow`.
 - *Suggested command:* /impeccable colorize
 
 **[P2] No legend on the 3-series Netzanschluss chart.** Grid (red)/consumption (blue)/production (yellow) overlaid with no rendered legend (`uebersicht.js:161-168`); only decode path is pointer-only hover.
@@ -79,9 +79,9 @@ This is a trustworthy, well-engineered instrument that is quietly excellent at *
 
 **Jordan (PV owner, first-timer):** First paint is a screen of "–" and empty charts with no "wird geladen" skeleton — looks broken (`:725-738`). Then eight stacked regions (Autarkiegrad / Eigenverbrauchsgrad / Import / Stromherkunft / Stromverwendung) — the opposite of "at-a-glance." The Netzanschluss chart's three unlabelled lines are undecodable without hovering. Red fill under the grid line while their panels export tells them they're buying costly power exactly when they're selling. Only the flow status headline rescues the glance.
 
-**Sam (accessibility-dependent):** The two headline KPIs expose no value to assistive tech (Gauge aria-hidden, P1). Coloured stat/KPI values fail AA contrast (P1). Every chart is pointer-only — no keyboard access to a single data point (`charts.js:186-215`); the flow SVG's `aria-label` is static prose with no live numbers, so only the status `<p>` conveys the headline figure; all per-load/production/member chart values are unreadable.
+**Sam (accessibility-dependent):** The two headline KPIs expose no value to assistive tech (Gauge aria-hidden, P1). Coloured stat/KPI values fail AA contrast (P1). Every chart is pointer-only — no keyboard access to a single data point (`charts.js:186-215`); the flow SVG's `aria-label` is static prose with no live numbers, so only the status `<p>` conveys the headline figure; all per-load/production chart values are unreadable.
 
-**Casey (distracted mobile):** `.ov-subgrid` collapses to one column ≤767px (`style.css:539-541`), turning the page into a very long scroll: flow + status + 2 composition bars + toggle + note + 4 KPI tiles + Netz chart + one chart per production + per load + per vZEV member. The "quick glance" is buried; no sticky/condensed summary. Tap targets are fine, but density defeats the use case.
+**Casey (distracted mobile):** `.ov-subgrid` collapses to one column ≤767px (`style.css:539-541`), turning the page into a very long scroll: flow + status + 2 composition bars + toggle + note + 4 KPI tiles + Netz chart + one chart per production + per load. The "quick glance" is buried; no sticky/condensed summary. Tap targets are fine, but density defeats the use case.
 
 ## Minor Observations
 
@@ -89,13 +89,12 @@ This is a trustworthy, well-engineered instrument that is quietly excellent at *
 - `common.stale` = "Zuletzt aktualisiert {time}" does double duty as neutral page-header timestamp and the shell's *offline* stale note; the header never actually signals staleness (no age threshold vs now).
 - Hint-banner amber + a waiting-load amber badge can appear together — borderline One-Accent-Rule violation.
 - `CompositionBars` "Heute" omits the battery (with a note) while "Jetzt" includes it — the segment set changes between toggles, which can read as a data glitch.
-- vZEV panel charts are in Wh while sibling panels are in W (correct per domain, but visual sameness invites misreading).
 - Flow SVG capped at `max-width:520px` and centred; on wide desktop it's a small island in a wide card.
 - `prefers-reduced-motion` collapse is present and correct (`style.css:1173-1180`).
 
 ## Questions to Consider
 
-1. Persona B's job is "at-a-glance," yet the flagship stacks ~8 analytic regions. Should Übersicht be *only* flow + status + four KPIs, with per-load/production/member charts relocated to Verlauf or a disclosure?
+1. Persona B's job is "at-a-glance," yet the flagship stacks ~8 analytic regions. Should Übersicht be *only* flow + status + four KPIs, with per-load/production charts relocated to Verlauf or a disclosure?
 2. Provenance tagging is the system's signature move — why is it absent from the one page everyone opens? Is the doctrine real, or does it only survive where it's cheap (Zähler)?
 3. Two gauges plus two bare numbers in one strip: is the gauge earning its pixels, or would four consistent, screen-reader-legible number tiles read faster *and* fix the P1 a11y gap?
 4. The emotional payoff is Ersparnis (CHF saved). Why is it one of four equal tiles instead of the page's single hero — the number a non-expert actually came for?

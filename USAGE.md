@@ -1,6 +1,6 @@
-# vZEV Usage Guide
+# gPlug EMS Usage Guide
 
-This guide covers how to set up, configure, and run the vZEV Energy Management System — both the simulator (for testing and demonstration) and the production EMS on physical gPlug devices.
+This guide covers how to set up, configure, and run the gPlug Energy Management System (EMS) — both the simulator (for testing and demonstration) and the production EMS on physical gPlug devices.
 
 ## Prerequisites
 
@@ -144,14 +144,14 @@ Key fields:
 
 ```sh
 cd ems/backend
-make   # produces build/ems-vzev-v<VERSION>.tapp
+make   # produces build/ems-v<VERSION>.tapp
 ```
 
 ### 3. Deploy to the gPlug device
 
 1. Open the Tasmota web UI at `http://<gplug-ip>/`
-2. Go to **Firmware Upgrade** and upload `build/ems-vzev-v<VERSION>.tapp`
-3. After the upload completes, upload your `site.json` (and `ems.json` if used) via the Tasmota filesystem manager
+2. Go to **Firmware Upgrade** and upload `build/ems-v<VERSION>.tapp`
+3. After the upload completes, upload your `site.json` via the Tasmota filesystem manager
 4. Restart the device
 
 ### 4. Access the EMS frontend
@@ -168,18 +168,8 @@ This dashboard shows all loads and productions, their current states, and allows
 
 ## Network Requirements
 
-- All gPlug devices and the simulator must be on the **same LAN**
-- The EMS uses **UDP multicast** for inter-site coordination: `239.3.0.1:5007`
-- Ensure routers/switches allow UDP multicast traffic on this group
-
-Optional: override the multicast address by placing a `udpclient.json` on the device filesystem:
-
-```json
-{
-  "multicast_ip": "239.3.0.1",
-  "port": 5007
-}
-```
+- Each gPlug device runs standalone; there is no communication between devices
+- The device must reach its configured integrations (Home Assistant, Shelly, Modbus TCP, simulator) over the **LAN**
 
 ---
 

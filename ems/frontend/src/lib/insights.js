@@ -38,29 +38,25 @@ function isHole(r) {
      records : summed-or-raw /api/energy records (integer Wh; already
                cost-derived or not — costs are re-derived here from Wh).
      opts.tariffs : the /api/meta tariffs object (for Ersparnis re-derivation)
-     opts.vzev    : truthy when spec 005 is active → adds the «inkl. vZEV»
-                    Autarkie variant and the vZEV Saldo saving component
      opts.co2     : CO₂ factor in g CO₂eq/kWh (0/unset hides the stat)
 
-   Returns { autarky, autarkyVzev?, selfuse, savingChf, savingParts, co2Kg,
+   Returns { autarky, selfuse, savingChf, savingParts, co2Kg,
    incomplete }. Ratios are 0..1 (or null); savingChf/co2Kg are CHF/kg numbers.
    Any KPI that is undefined for the data is `null` — never NaN, never a fake 0
    (UC-802). If > 20 % of the period is missing, ALL KPIs are null and
    `incomplete` is true (Edge case: no confident numbers from holes). */
 function kpis(records, opts) {
   opts = opts || {};
-  var vzevOn = !!opts.vzev;
   var co2g = n(opts.co2);
   records = records || [];
   var total = records.length;
 
   /* sum only complete slots; count holes to apply the > 20 % rule */
-  var pv = 0, exp = 0, imp = 0, vin = 0, vout = 0, chg = 0, dis = 0;
+  var pv = 0, exp = 0, imp = 0, chg = 0, dis = 0;
   var holes = 0, used = 0;
   records.forEach(function (r) {
     if (isHole(r)) { holes++; return; }
     pv += r.pv_wh; exp += r.exp_wh; imp += r.imp_wh;
-    vin += (r.vzev_in_wh || 0); vout += (r.vzev_out_wh || 0);
     chg += chgOf(r); dis += disOf(r);
     used++;
   });
@@ -69,7 +65,6 @@ function kpis(records, opts) {
 
   var out = { autarky: null, selfuse: null, savingChf: null,
               savingParts: null, co2Kg: null, incomplete: incomplete };
-  if (vzevOn) out.autarkyVzev = null;
   if (total === 0 || incomplete || used === 0) return out;
 
   var selfuseWh = Math.max(0, pv - exp);
@@ -79,23 +74,13 @@ function kpis(records, opts) {
   out.autarky = verbrauch > 0 ? clamp01(Math.max(0, verbrauch - imp) / verbrauch) : null;
   out.selfuse = pv > 0 ? clamp01(selfuseWh / pv) : null;
 
-  if (vzevOn) {
-    /* locally produced community power counts as local → grid-operator import
-       is reduced by the vZEV-covered share (UC-802 «inkl. vZEV»). */
-    var gridOp = Math.max(0, imp - vin);
-    out.autarkyVzev = verbrauch > 0 ? clamp01((verbrauch - gridOp) / verbrauch) : null;
-  }
-
   /* Ersparnis (UC-804): re-derive CHF from the summed Wh (never sum rounded
      CHF), then compose the headline from its components. */
-  var c = deriveCosts({ imp_wh: imp, exp_wh: exp, pv_wh: pv,
-                        vzev_in_wh: vin, vzev_out_wh: vout }, opts.tariffs || {});
+  var c = deriveCosts({ imp_wh: imp, exp_wh: exp, pv_wh: pv }, opts.tariffs || {});
   var selfuseChf = c.saving_selfuse_chf || 0;
   var feedinChf = c.revenue_feedin_chf || 0;
-  var vzevChf = vzevOn ? ((c.revenue_vzev_chf || 0) - (c.cost_vzev_chf || 0)) : 0;
-  out.savingParts = { selfuse: selfuseChf, feedin: feedinChf,
-                      vzev: vzevOn ? vzevChf : null };
-  out.savingChf = Math.round((selfuseChf + feedinChf + vzevChf) * 100) / 100;
+  out.savingParts = { selfuse: selfuseChf, feedin: feedinChf };
+  out.savingChf = Math.round((selfuseChf + feedinChf) * 100) / 100;
 
   /* CO₂ vermieden = self-consumed local energy × factor (UC-804). */
   out.co2Kg = (co2g && co2g > 0) ? (selfuseWh / 1000) * co2g / 1000 : null;
@@ -103,10 +88,8 @@ function kpis(records, opts) {
   return out;
 }
 
-/* hubFlows(sample, vzev, opts) → {nodes, edges} | null  (live flow card, UC-1001)
+/* hubFlows(sample, opts) → {nodes, edges} | null  (live flow card, UC-1001)
      sample : newest /api/power sample {grid_w, pv_w, bat_w, load_w} or null
-     vzev   : signed live vZEV power in W (+import from community, −export to
-              community) or null when spec 005 is absent
      opts   : {pv, bat} — whether the site HAS a PV / battery node (default
               both true). An absent node is omitted and counts as 0; a present
               node whose value is null is 'unknown' (spec 010 D-3: unknown ≠ 0).
@@ -114,14 +97,14 @@ function kpis(records, opts) {
    Haus is the hub: every edge connects one node to Haus, so the numbers add up
    at Haus (in = consumption + out). PV → Haus carries the WHOLE PV power, Haus
    carries the site consumption (pv + bat + grid, the GridPanel balance), and
-   Haus ↔ Netz carries the grid exchange with the vZEV share split off.
+   Haus ↔ Netz carries the grid exchange.
 
-   nodes: {pv?, bat?, haus, netz, vzev?} each {watts ≥ 0 | null, state}
+   nodes: {pv?, bat?, haus, netz} each {watts ≥ 0 | null, state}
    edges: [{node, dir: 'in' | 'out' (into / out of Haus), watts ≥ 0, state}]
    state: 'ok' flowing · 'zero' real < 1 W (dimmed) · 'unknown' no data (grey
    «–», never a fabricated 0 — night and no-data must look different, UC-1003).
    Grid semantics follow 003 FR-305 (grid_w > 0 = import, < 0 = export). */
-function hubFlows(sample, vzev, opts) {
+function hubFlows(sample, opts) {
   if (!sample) return null;
   opts = opts || {};
   var hasPv = opts.pv !== false, hasBat = opts.bat !== false;
@@ -130,7 +113,6 @@ function hubFlows(sample, vzev, opts) {
   var pv = hasPv && !pvU ? Math.max(0, pvN) : 0;
   var bat = hasBat && !batU ? batN : 0;
   var grid = gridU ? 0 : gridN;
-  var v = n(vzev);
 
   function st(w, unknown) { return unknown ? 'unknown' : (w < 1 ? 'zero' : 'ok'); }
   function node(w, unknown) { return { watts: unknown ? null : w, state: st(w, unknown) }; }
@@ -148,26 +130,18 @@ function hubFlows(sample, vzev, opts) {
   var cons = Math.max(0, pv + bat + grid);
   nodes.haus = node(cons, gridU || pvU || batU);
 
-  /* grid exchange, the vZEV-covered share split off (same rule as sourcesNow) */
-  var imp = Math.max(0, grid), exp = Math.max(0, -grid);
-  var vIn = (v !== null && v > 0) ? Math.min(v, imp) : 0;
-  var vOut = (v !== null && v < 0) ? Math.min(-v, exp) : 0;
+  /* grid exchange */
   var gridDir = grid > 0 ? 'in' : 'out';
-  var netzW = grid > 0 ? imp - vIn : exp - vOut;
+  var netzW = Math.abs(grid);
   nodes.netz = node(netzW, gridU);
   edges.push({ node: 'netz', dir: gridDir, watts: netzW, state: st(netzW, gridU) });
-  if (v !== null) {
-    var vW = vIn + vOut;
-    nodes.vzev = node(vW, gridU);
-    edges.push({ node: 'vzev', dir: v > 0 ? 'in' : 'out', watts: vW, state: st(vW, gridU) });
-  }
   return { nodes: nodes, edges: edges };
 }
 
 /* flowHeadline(hub) → {key, vars} | null  (spec 010 FR-1002, UC-1001)
    A one-line words-first summary driven by the SAME hub data the card draws
    (never a second derivation). {pct} = share of the consumption covered by PV
-   (PV minus what goes to the grid/community and into the battery), 0..100.
+   (PV minus what goes to the grid and into the battery), 0..100.
      flow.status_unknown   — grid or consumption unknown
      flow.status_export    — net feed-in        {pct, w = eingespeist}
      flow.status_import_pv — draw while PV runs {pct, w = bezogen}
@@ -180,7 +154,7 @@ function flowHeadline(hub) {
   if (nd.netz.state === 'unknown' || nd.haus.state === 'unknown') return { key: 'flow.status_unknown', vars: {} };
   var imp = 0, exp = 0, charge = 0;
   hub.edges.forEach(function (e) {
-    if (e.node === 'netz' || e.node === 'vzev') { if (e.dir === 'in') imp += e.watts; else exp += e.watts; }
+    if (e.node === 'netz') { if (e.dir === 'in') imp += e.watts; else exp += e.watts; }
     if (e.node === 'bat' && e.dir === 'out') charge += e.watts;
   });
   var pv = nd.pv ? nd.pv.watts : 0;
@@ -197,34 +171,6 @@ function flowHeadline(hub) {
   return { key: 'flow.status_idle', vars: {} };
 }
 
-/* vzevPowerNow(members) → signed live vZEV power in W, or null (FR-1003, D-2).
-   `members` is the api.getVzevMembers() array: each member carries a signed
-   `net_wh` (producer member → +import to this site, consumer member → −export)
-   and a per-15-min-slot `points` [{t, y(≥0 allocated Wh)}] series. The live
-   community exchange is the net of the NEWEST closed slot across all members,
-   converted to an average-W equivalent (Wh ÷ 0.25 h = Wh × 4). Slot-based, so
-   the caller labels it «Ø 15 min». null when spec 005 is absent (no members)
-   or no slot has been closed yet. */
-function vzevPowerNow(members) {
-  if (!members || !members.length) return null;
-  var newest = null;
-  members.forEach(function (m) {
-    (m.points || []).forEach(function (p) {
-      if (newest === null || p.t > newest) newest = p.t;
-    });
-  });
-  if (newest === null) return null;
-  var net = 0, any = false;
-  members.forEach(function (m) {
-    var sign = (m.net_wh || 0) < 0 ? -1 : 1;   /* consumer member → export (−) */
-    (m.points || []).forEach(function (p) {
-      if (p.t === newest) { net += sign * (p.y || 0); any = true; }
-    });
-  });
-  if (!any) return null;
-  return net * 4;                              /* Wh per 15-min slot → average W */
-}
-
 /* Segment colour tokens, keyed by composition-segment id (spec 010 FR-1006).
    Returned as data so the presentational component needs no key→colour map. */
 var SEG_COLOR = {
@@ -232,20 +178,17 @@ var SEG_COLOR = {
   'comp.load': 'var(--c-consumption)',     /* Haus — blau */
   'comp.battery': 'var(--c-battery)',      /* Batterie entladen — türkis */
   'comp.charge': 'var(--c-battery)',       /* Batterie laden — türkis */
-  'comp.vzev': 'var(--c-vzev)',            /* vZEV — grün */
   'comp.grid': 'var(--c-import)',          /* Netzbezug — rot */
-  'comp.feedin': 'var(--c-vzev-fill)'      /* Einspeisung — grün, heller */
+  'comp.feedin': 'var(--c-export-fill)'    /* Einspeisung — grün, heller */
 };
 function seg(key, value) {
   return { key: key, value: Math.max(0, value || 0), color: SEG_COLOR[key] };
 }
 
-/* sourcesNow(sample, vzevW) → {cover, usage, unknown}  (spec 010 FR-1006, UC-1004)
+/* sourcesNow(sample) → {cover, usage, unknown}  (spec 010 FR-1006, UC-1004)
    The live composition of the newest /api/power sample:
-     cover (Verbrauch gedeckt aus): PV direkt + Batterie-Entladung +
-                                     vZEV-Bezug + Rest-Netzbezug
-     usage (Strom verwendet für): Haus + Batterie-Ladung +
-                                     vZEV-Export + Rest-Einspeisung
+     cover (Verbrauch gedeckt aus): PV direkt + Batterie-Entladung + Netzbezug
+     usage (Strom verwendet für): Haus + Batterie-Ladung + Einspeisung
    «PV direkt» is PV minus export minus battery charge (issue #20 — counting the
    charge in both the PV segment and its own would overfill the bar). `cover`
    sums to the house load by construction (selfuse + batDis + imp), so `usage`
@@ -254,31 +197,24 @@ function seg(key, value) {
    used to leave every usage segment at 0 («Kein Fluss» despite real
    consumption, issue #21). Segments clamp ≥ 0 and sum to their bar's total.
    `unknown` is true when pv or grid is null — the bar then shows the grey
-   «keine Daten» state instead of a fabricated 100 % Netz share (UC-1004). The
-   vZEV share is capped at the current import/export (slot-mean vs. now, Edge
-   case) — same as hubFlows. */
-function sourcesNow(sample, vzevW) {
+   «keine Daten» state instead of a fabricated 100 % Netz share (UC-1004). */
+function sourcesNow(sample) {
   if (!sample) return { cover: [], usage: [], unknown: true };
   var pvN = n(sample.pv_w), batN = n(sample.bat_w), gridN = n(sample.grid_w);
   var unknown = pvN === null || gridN === null;
   var pv = pvN === null ? 0 : pvN, bat = batN === null ? 0 : batN, grid = gridN === null ? 0 : gridN;
-  var v = n(vzevW);
 
   var imp = Math.max(0, grid), exp = Math.max(0, -grid);
   var batDis = Math.max(0, bat), batChg = Math.max(0, -bat);
   var selfuse = Math.max(0, pv - exp - batChg);
   var house = selfuse + batDis + imp;
-  var vzevImp = (v !== null && v > 0) ? Math.min(v, imp) : 0;
-  var vzevExp = (v !== null && v < 0) ? Math.min(-v, exp) : 0;
 
   return {
     cover: [
-      seg('comp.pv', selfuse), seg('comp.battery', batDis),
-      seg('comp.vzev', vzevImp), seg('comp.grid', imp - vzevImp)
+      seg('comp.pv', selfuse), seg('comp.battery', batDis), seg('comp.grid', imp)
     ],
     usage: [
-      seg('comp.load', house), seg('comp.charge', batChg),
-      seg('comp.vzev', vzevExp), seg('comp.feedin', exp - vzevExp)
+      seg('comp.load', house), seg('comp.charge', batChg), seg('comp.feedin', exp)
     ],
     unknown: unknown
   };
@@ -291,11 +227,10 @@ function sourcesNow(sample, vzevW) {
    complete slots; `unknown` when no complete slot exists (never a fake 100 %). */
 function sourcesToday(records) {
   records = records || [];
-  var pv = 0, exp = 0, imp = 0, vin = 0, vout = 0, chg = 0, dis = 0, used = 0;
+  var pv = 0, exp = 0, imp = 0, chg = 0, dis = 0, used = 0;
   records.forEach(function (r) {
     if (isHole(r)) return;
     pv += r.pv_wh; exp += r.exp_wh; imp += r.imp_wh;
-    vin += (r.vzev_in_wh || 0); vout += (r.vzev_out_wh || 0);
     chg += chgOf(r); dis += disOf(r);
     used++;
   });
@@ -303,13 +238,11 @@ function sourcesToday(records) {
   var bat = hasBattery(records);
   var selfuse = Math.max(0, pv - exp - chg);
   var house = selfuse + dis + imp;
-  var vzevImp = Math.min(Math.max(0, vin), imp);
-  var vzevExp = Math.min(Math.max(0, vout), exp);
   var cover = [seg('comp.pv', selfuse)];
   var usage = [seg('comp.load', house)];
   if (bat) { cover.push(seg('comp.battery', dis)); usage.push(seg('comp.charge', chg)); }
-  cover.push(seg('comp.vzev', vzevImp), seg('comp.grid', imp - vzevImp));
-  usage.push(seg('comp.vzev', vzevExp), seg('comp.feedin', exp - vzevExp));
+  cover.push(seg('comp.grid', imp));
+  usage.push(seg('comp.feedin', exp));
   return { cover: cover, usage: usage, unknown: false, battery: bat };
 }
 
@@ -349,5 +282,5 @@ function balance(records) {
 
 export {
   kpis, hubFlows, flowHeadline, balance,
-  vzevPowerNow, sourcesNow, sourcesToday, pvSeriesAllNull
+  sourcesNow, sourcesToday, pvSeriesAllNull
 };

@@ -4,8 +4,11 @@
 **Created:** 2026-07-29
 **Status:** Draft
 **Depends on:** `002-ui-shell-design-i18n`, `003-uebersicht-live-monitor`,
-`008-energiefluss-kennzahlen` (vZEV parts optional on `005`)
+`008-energiefluss-kennzahlen`
 (read `specs/README.md` for shared constraints, personas and the glossary)
+
+> **Issue #1 (2026-09-23).** The community parts (flow node, D-2, FR-1003, composition
+> segments) were removed together with spec 005.
 
 ## Overview
 
@@ -22,8 +25,7 @@ promise — *"auf einen Blick sehen, wohin der Strom fliesst und woher er kommt"
    Netzbezug = rot, Einspeisung/lokale Energie = grün**.
 3. **Producers are effectively invisible in the charts** — a chain of verified defects (see
    «Defects» below): missing i18n keys render raw key names as node labels, `null` production
-   samples are silently coerced to `0 W`, the vZEV flow is a hard-coded `null` placeholder,
-   and a `productionType` mismatch silently drops a producer from `/api/power` sums while it
+   samples are silently coerced to `0 W`, and a `productionType` mismatch silently drops a producer from `/api/power` sums while it
    still appears in the Erzeuger panel.
 4. **The flow diagram shows *that* energy flows, but not the composition.** There is no view
    answering «aus welchen Komponenten setzt sich mein Verbrauch zusammen / wohin geht meine
@@ -52,7 +54,7 @@ Binding conclusion for this spec (**the semantic color system**):
 | PV / Erzeugung | `--c-production` | **Gelb/Ocker** (Sonne) — z. B. das bisherige `#D99A06` |
 | Verbrauch / Haus / Lasten | `--c-consumption` | **Blau** — z. B. abgedunkeltes `#2D9CDB` |
 | Netzbezug (Import) | `--c-import` | **Rot** `#C62D20` (unverändert) |
-| Netzeinspeisung + vZEV (lokale Energie) | `--c-vzev` | **Grün** `#3E7C28` (unverändert) |
+| Netzeinspeisung (lokale Energie) | `--c-export` | **Grün** `#3E7C28` (unverändert) |
 | Batterie | `--c-battery` (neu) | **Türkis/Petrol** — eigenständig, nicht mit PV-Gelb oder Akzent-Amber verwechselbar |
 | Netz (Knoten, neutral) | `--c-navy` | Navy (unverändert) |
 
@@ -67,8 +69,7 @@ alone** (deuteranopia): arrowheads, position and labels stay redundant encodings
 - **D-1** `flow.*`, `kpi.*` and `tooltip.kpi_*`/`tooltip.flow` i18n keys used by
   `pages/uebersicht.js` are missing from `i18n/de.json`/`en.json` — node labels render as raw
   keys («flow.pv»), so the diagram reads as broken.
-- **D-2** `uebersicht.js` passes `vzevW = null` («placeholder until spec 005 provides it»)
-  although 005 is implemented — the vZEV node/edges can never appear.
+- **D-2** (removed with issue #1 — concerned the community flow node.)
 - **D-3** `insights.flowsNow()` coerces `pv_w: null` to `0` (`n(sample.pv_w) || 0`): an
   unpolled/unreachable production renders as a dimmed 0-W-edge — indistinguishable from
   night. Same fake-zero in the Netzanschluss stat row (`s.pv_w + Math.max(0, s.bat_w)` with
@@ -89,7 +90,7 @@ site is importing or exporting and which producers contribute.
 
 **Acceptance Scenarios**
 - **Given** the flow diagram, **Then** sources (PV, Batterie entladend) sit **left**, Haus
-  **centre**, sinks (Netz, vZEV, Batterie ladend) **right** — energy always reads
+  **centre**, sinks (Netz, Batterie ladend) **right** — energy always reads
   left→right; a node that is currently a source renders on the source side (battery side
   switches with sign, with a transition, not a jump).
 - **Given** an active edge, **Then** it shows an arrowhead scaled with stroke width **and** a
@@ -104,11 +105,11 @@ site is importing or exporting and which producers contribute.
 
 ### UC-1002: Colors mean the same thing here as in every Swiss PV app
 **Acceptance Scenarios**
-- **Given** any chart, stat, gauge, badge or edge on Übersicht, Verlauf, vZEV and Zähler,
+- **Given** any chart, stat, gauge, badge or edge on Übersicht, Verlauf and Zähler,
   **Then** it uses the semantic color system above: Produktion gelb, Verbrauch blau, Bezug
-  rot, Einspeisung/vZEV grün, Batterie türkis — no page-local deviations.
+  rot, Einspeisung grün, Batterie türkis — no page-local deviations.
 - **Given** the Netzanschluss combined chart, **Then** import periods stay red-filled and
-  export periods green-filled (`--c-import-fill`/`--c-vzev-fill`, 003 UC-301 unchanged), the
+  export periods green-filled (`--c-import-fill`/`--c-export-fill`, 003 UC-301 unchanged), the
   production line is yellow and the consumption line blue.
 - **Given** a color-vision-deficient user (deuteranopia simulation), **Then** import vs.
   export remains distinguishable via position/arrow/label — verified in the manual checklist.
@@ -128,18 +129,14 @@ site is importing or exporting and which producers contribute.
 - **Given** productions are configured but *every* sample in the window has `pv_w === null`,
   **Then** the Erzeuger panel shows a data-quality notice («Keine Live-Daten von der
   Produktion — Integration/Erreichbarkeit prüfen», i18n key) instead of silently flat charts.
-- **Given** a vZEV with live member data (005), **Then** the vZEV node appears with the
-  net community flow derived from the existing member data (D-2), labeled as 15-min mean
-  («Ø 15 min») since the exchange is inherently slot-based energy.
 
 ### UC-1004: See the composition — where consumption comes from, where production goes
 **Acceptance Scenarios**
 - **Given** the flow card, **Then** below the diagram two horizontal 100 %-stacked bars show
   the live composition (newest sample, same poll):
-  - **Stromherkunft** (Verbrauch gedeckt aus): PV (gelb) · Batterie (türkis) · vZEV (grün) ·
-    Netz (rot)
+  - **Stromherkunft** (Verbrauch gedeckt aus): PV (gelb) · Batterie (türkis) · Netz (rot)
   - **Stromverwendung** (Produktion verwendet für): Eigenverbrauch (blau) · Batterie laden
-    (türkis) · vZEV (grün) · Einspeisung (grün, heller) —
+    (türkis) · Einspeisung (grün) —
   each segment ≥ 1 % gets its `fmtW` label on hover (chart hover pattern), the bar has a
   compact legend, and zero segments collapse.
 - **Given** the toggle «Jetzt | Heute» on the card, **Then** «Heute» renders the same two
@@ -147,7 +144,7 @@ site is importing or exporting and which producers contribute.
   tooltip note (the energy rings deliberately exclude the battery — 001/`meter.be` contract).
 - **Given** unknown inputs (null pv), **Then** the affected bar shows the grey «keine Daten»
   state — never a fabricated 100 % Netz share.
-- **Given** a site without battery and without vZEV, **Then** the bars degrade to two-segment
+- **Given** a site without battery, **Then** the bars degrade to two-segment
   bars (PV/Netz bzw. Eigenverbrauch/Einspeisung) without empty legend entries.
 
 ## Functional Requirements
@@ -155,15 +152,12 @@ site is importing or exporting and which producers contribute.
 - **FR-1001** Semantic color tokens per the Research table: swap the roles of
   `--c-production` (→ gelb) and `--c-consumption` (→ blau), add `--c-battery`, retire
   `--c-amber` from energy semantics (stays UI accent). All usages across `style.css`,
-  `charts.js`, `uebersicht.js`, `verlauf.js`, vZEV and Zähler pages follow the tokens — no
+  `charts.js`, `uebersicht.js`, `verlauf.js` and Zähler pages follow the tokens — no
   literal energy-color hex in components. AA evidence per 002 FR-209.
 - **FR-1002** Flow diagram UX per UC-1001: source-left/sink-right layout, scaled arrowheads,
   animated dash drift (`prefers-reduced-motion`-guarded), status headline (i18n
   `flow.status_*` from a pure, tested function `flowStatus(edges) → key|null`).
-- **FR-1003** Wire the live vZEV flow (D-2): derive the signed community power estimate from
-  the existing 005 member/flow data (net of the newest closed slot, `net_wh × 4` W-equivalent),
-  pass it to `flowsNow`/diagram/stat row; label as 15-min mean. Hidden when 005 absent
-  (003 FR-310 pattern).
+- **FR-1003** (removed with issue #1 — wired the community flow.)
 - **FR-1004** Null-safety (D-3/D-4): `insights.flowsNow` distinguishes `null` (unknown) from
   `0`; edges gain a `state: 'ok'|'zero'|'unknown'`; stat row and Erzeuger history render «—»/
   gaps for unknown; consumption derivation uses every field that *is* present. No fake zeros
@@ -171,11 +165,11 @@ site is importing or exporting and which producers contribute.
 - **FR-1005** Data-quality notice for the Erzeuger panel per UC-1003 (all-null window →
   hint; pure predicate in `insights.js`, i18n-keyed, dismiss per session like UC-305 hints).
 - **FR-1006** Composition bars per UC-1004: new pure functions in `insights.js` —
-  `sourcesNow(sample, vzevW) → {cover: segments[], usage: segments[]}` and
+  `sourcesNow(sample) → {cover: segments[], usage: segments[]}` and
   `sourcesToday(records) → same` (battery omitted, documented) — rendered by one new
   presentational component (hand-rolled SVG/JSX like `charts.js`; no external lib, C-2).
-  Formulas: Deckung = PV-Eigenverbrauch + Batterie-Entladung + vZEV-Bezug + Rest-Netzbezug;
-  Verwendung = Eigenverbrauch + Batterie-Ladung + vZEV-Export + Rest-Einspeisung; segments
+  Formulas: Deckung = PV-Eigenverbrauch + Batterie-Entladung + Netzbezug;
+  Verwendung = Eigenverbrauch + Batterie-Ladung + Einspeisung; segments
   clamp ≥ 0 and sum to the respective total.
 - **FR-1007** Guard against D-5 in Einstellungen (006 form): `productionType` becomes a
   select limited to `PHOTOVOLTAIC` / `BATTERY`; loading a config with another value shows a
@@ -206,8 +200,6 @@ site is importing or exporting and which producers contribute.
 - Night: all-zero flows → dimmed edges, «0 %» bars collapse to «100 % Netz» (real zero, not
   unknown-grey).
 - Battery flipping sign frequently → side switch debounced (≥ 2 polls) to avoid jitter.
-- vZEV estimate vs. instantaneous grid power disagree (slot mean vs. now): vZEV segment is
-  capped at the current import/export like `flowsNow` already does; tooltip notes «Ø 15 min».
 - Export > PV (measurement skew): segments clamp ≥ 0 (008 pattern).
 - Legacy config with `productionType: "PV"`: warning per FR-1007, everything else renders.
 - `prefers-reduced-motion` / `prefers-contrast: more`: drift off, tokens unchanged (AA holds).
@@ -234,19 +226,18 @@ site is importing or exporting and which producers contribute.
 
 - Node tests (`tests/` frontend pattern): `flowsNow` null/zero/unknown matrix;
   `flowStatus` for import/export/covered/no-data fixtures; `sourcesNow`/`sourcesToday`
-  formulas incl. clamps, vZEV cap, battery omission (Heute), unknown propagation; i18n
+  formulas incl. clamps, battery omission (Heute), unknown propagation; i18n
   completeness test (FR-1008).
 - Manual checklist: 5-second direction test (3 fixtures, UC-1001); deuteranopia simulation
-  (UC-1002); night vs. no-data distinction (UC-1003); bars with/without Batterie & vZEV;
+  (UC-1002); night vs. no-data distinction (UC-1003); bars with/without Batterie;
   «Jetzt | Heute» toggle; 360/768/1440 px; `prefers-reduced-motion`.
 
 ## Acceptance Checklist
 
 - [ ] Flow direction legible in ≤ 5 s without reading numbers (layout, arrows, drift, headline)
 - [ ] Semantic colors match the Swiss convention (Produktion gelb, Verbrauch blau, Bezug rot,
-      Einspeisung/vZEV grün, Batterie türkis) on every page, AA-documented
-- [ ] All D-1…D-5 defects fixed; producers visible; «unbekannt» ≠ «0» everywhere
-- [ ] vZEV node live with 005, hidden without; labeled as 15-min mean
+      Einspeisung grün, Batterie türkis) on every page, AA-documented
+- [ ] D-1, D-3…D-5 defects fixed; producers visible; «unbekannt» ≠ «0» everywhere
 - [ ] Herkunft/Verwendung stacked bars (Jetzt + Heute) with correct, tested formulas
 - [ ] i18n completeness test in `make test`/node test run and green
 - [ ] Zero Berry diffs; bundle growth ≤ 8 KB; existing 003/008 behaviour unchanged

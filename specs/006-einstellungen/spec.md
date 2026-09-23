@@ -3,8 +3,7 @@
 **Feature Branch:** `006-einstellungen`
 **Created:** 2026-07-14
 **Status:** Implemented
-**Depends on:** `002-ui-shell-design-i18n` (and 001 for the tariffs schema; 005 only for the
-scope boundary). Read `specs/README.md` for shared constraints and the glossary.
+**Depends on:** `002-ui-shell-design-i18n` (and 001 for the tariffs schema). Read `specs/README.md` for shared constraints and the glossary.
 
 > **Implementation note (reconciled 2026-07-27).** Delivered. `GET/POST
 > /api/config` with JSON validation, atomic write (temp + rename) and reload
@@ -30,17 +29,14 @@ browser — today this requires editing JSON on the device. Figma frames: Site `
 `41:1534`, Produktion `41:1592`, Netzanschluss `41:1644`, Tarife `41:1688`. Tabs as pill
 buttons under the page title (active pill amber).
 
-Scope boundary (review feedback "Was wird hier editiert und was bei vZEV?"): **Einstellungen =
-own site** (identity, loads, productions, grid connection, tariffs). **vZEV page = other
-members** (spec 005). A short intro sentence on the Site tab states exactly this
-(`settings.scope_note`).
+Scope: **Einstellungen = own site** (identity, loads, productions, grid connection, tariffs).
+(The former boundary against a community-member page disappeared with issue #1.)
 
 ## Use Cases
 
 ### UC-601: Edit site identity
 **Acceptance Scenarios**
-- **Given** the Site tab, **Then** fields ID (read-only after first save — it keys the vZEV
-  protocol), Name, Ort, Beschreibung show current values from `GET /site`; «Speichern» persists
+- **Given** the Site tab, **Then** fields ID (read-only after first save), Name, Ort, Beschreibung show current values from `GET /site`; «Speichern» persists
   and the sidebar/Übersicht header reflect the new name after reload of config.
 
 ### UC-602: Manage loads
@@ -70,9 +66,9 @@ As UC-602 with fields ID, Typ (Photovoltaik/Batterie), Dimension (W/kW), Integra
 **Acceptance Scenarios**
 - **Given** the Tarife tab (Figma `41:1688`), **Then** the 001 FR-107 tariff fields are
   editable: Netzbezug (Einheitstarif toggle + Tarif CHF/kWh), Netzeinspeisung
-  (Rückspeisevergütung CHF/kWh), Monatliche Grundgebühr (CHF/Monat), vZEV Export & Bezug
-  (CHF/kWh). Saving updates `/api/meta` tariffs and thus all cost displays (Verlauf,
-  Abrechnung) on next fetch.
+  (Rückspeisevergütung CHF/kWh), Monatliche Grundgebühr (CHF/Monat). Saving updates `/api/meta`
+  tariffs and thus all cost displays (Verlauf, KPIs) on next fetch. (The community
+  Export/Bezug tariffs were removed with issue #1.)
 - Einheitstarif is the only mode in this iteration; the toggle is on and disabled with tooltip
   «Hoch-/Niedertarif folgt in einer späteren Version» (honest UI over dead controls).
 
@@ -137,7 +133,7 @@ As UC-602 with fields ID, Typ (Photovoltaik/Batterie), Dimension (W/kW), Integra
 
 ## Out of Scope
 
-- User authentication / roles; Hoch-/Niedertarif (UC-605); vZEV member editing (005); firmware/
+- User authentication / roles; Hoch-/Niedertarif (UC-605); firmware/
   device settings (Tasmota's own UI covers those); i18n language switching at runtime (002:
   per-language builds).
 
@@ -162,5 +158,5 @@ As UC-602 with fields ID, Typ (Photovoltaik/Batterie), Dimension (W/kW), Integra
 - [ ] Round-trip: load `examples/site-1.json`, edit each tab, save, reload — no key loss
 - [ ] Invalid saves rejected server-side, file untouched
 - [ ] Deleting an active load switches it off first
-- [ ] Tariff changes propagate to Verlauf/Abrechnung cost displays
+- [ ] Tariff changes propagate to Verlauf cost displays
 - [ ] `make test` green incl. new Berry tests

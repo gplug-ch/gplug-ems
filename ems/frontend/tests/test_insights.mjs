@@ -5,12 +5,12 @@ import test from 'node:test';
 import assert from 'node:assert';
 import {
   kpis, hubFlows, flowHeadline, balance,
-  vzevPowerNow, sourcesNow, sourcesToday, pvSeriesAllNull
+  sourcesNow, sourcesToday, pvSeriesAllNull
 } from '../src/lib/insights.js';
 
 /* helper: build a complete energy record */
 function rec(o) {
-  return Object.assign({ ts: 0, pv_wh: 0, exp_wh: 0, imp_wh: 0, vzev_in_wh: 0, vzev_out_wh: 0 }, o);
+  return Object.assign({ ts: 0, pv_wh: 0, exp_wh: 0, imp_wh: 0 }, o);
 }
 function near(a, b, eps) { return Math.abs(a - b) <= (eps || 1e-6); }
 /* find the edge of `node` (to/from Haus) in a hubFlows() result */
@@ -27,7 +27,6 @@ test('kpis: basic autarky / selfuse / saving / co2', () => {
   assert.ok(near(k.savingChf, 0.12), 'saving 0.05 + 0.07');
   assert.ok(near(k.co2Kg, 0.0768), 'co2 = 0.6 kWh * 128 g / 1e6');
   assert.strictEqual(k.incomplete, false);
-  assert.strictEqual(k.autarkyVzev, undefined, 'no vzev variant unless opts.vzev');
 });
 
 test('kpis: night (pv=0) → selfuse null, not 0/NaN', () => {
@@ -83,14 +82,6 @@ test('kpis: empty records → all null, incomplete false', () => {
   assert.strictEqual(k.incomplete, false);
 });
 
-test('kpis: vZEV variant reduces grid-operator import', () => {
-  var k = kpis([rec({ pv_wh: 1000, exp_wh: 200, imp_wh: 500, vzev_in_wh: 300 })],
-    { tariffs: {}, vzev: true });
-  assert.ok(near(k.autarky, 800 / 1300), 'base autarky selfuse/verbrauch');
-  assert.ok(near(k.autarkyVzev, 1100 / 1300), 'vzev variant subtracts vzev_in from import');
-  assert.ok(k.savingParts && k.savingParts.vzev !== null, 'vzev saving component present');
-});
-
 test('kpis: co2 factor 0 hides the CO₂ stat', () => {
   var k = kpis([rec({ pv_wh: 1000, exp_wh: 200, imp_wh: 100 })], { tariffs: {}, co2: 0 });
   assert.strictEqual(k.co2Kg, null);
@@ -126,26 +117,8 @@ test('hubFlows: battery discharge and charge flip the edge direction', () => {
   assert.strictEqual(c.nodes.haus.watts, 500);
 });
 
-test('hubFlows: vZEV splits the import edge', () => {
-  var h = hubFlows({ pv_w: 0, bat_w: 0, grid_w: 500 }, 200);
-  assert.deepStrictEqual(edge(h, 'vzev'), { node: 'vzev', dir: 'in', watts: 200, state: 'ok' });
-  assert.strictEqual(edge(h, 'netz').watts, 300);
-});
-
-test('hubFlows: vZEV splits the export edge', () => {
-  var h = hubFlows({ pv_w: 1000, bat_w: 0, grid_w: -400 }, -150);
-  assert.deepStrictEqual(edge(h, 'vzev'), { node: 'vzev', dir: 'out', watts: 150, state: 'ok' });
-  assert.strictEqual(edge(h, 'netz').watts, 250);
-});
-
-test('hubFlows: no vZEV → no vZEV node', () => {
-  var h = hubFlows({ pv_w: 1000, bat_w: 0, grid_w: -400 });
-  assert.strictEqual(h.nodes.vzev, undefined);
-  assert.strictEqual(edge(h, 'vzev'), undefined);
-});
-
 test('hubFlows: absent PV / battery nodes are omitted and count as 0', () => {
-  var h = hubFlows({ pv_w: null, bat_w: null, grid_w: 700 }, null, { pv: false, bat: false });
+  var h = hubFlows({ pv_w: null, bat_w: null, grid_w: 700 }, { pv: false, bat: false });
   assert.strictEqual(h.nodes.pv, undefined);
   assert.strictEqual(h.nodes.bat, undefined);
   assert.deepStrictEqual(h.nodes.haus, { watts: 700, state: 'ok' });
@@ -198,10 +171,9 @@ test('hubFlows: null pv → pv and Haus unknown, grid still known', () => {
 });
 
 test('hubFlows: null grid → grid and Haus unknown, not fake zero', () => {
-  var h = hubFlows({ pv_w: 800, bat_w: 0, grid_w: null }, -100);
+  var h = hubFlows({ pv_w: 800, bat_w: 0, grid_w: null });
   assert.deepStrictEqual(h.nodes.netz, { watts: null, state: 'unknown' });
   assert.strictEqual(edge(h, 'netz').state, 'unknown');
-  assert.strictEqual(edge(h, 'vzev').state, 'unknown');
   assert.strictEqual(h.nodes.haus.state, 'unknown');
   assert.strictEqual(edge(h, 'pv').state, 'ok');
 });
@@ -234,11 +206,6 @@ test('flowHeadline: import without PV', () => {
   assert.deepStrictEqual(hl, { key: 'flow.status_import', vars: { w: 800 } });
 });
 
-test('flowHeadline: vZEV import counts as draw', () => {
-  var hl = flowHeadline(hubFlows({ pv_w: 0, bat_w: 0, grid_w: 500 }, 500));
-  assert.deepStrictEqual(hl, { key: 'flow.status_import', vars: { w: 500 } });
-});
-
 test('flowHeadline: battery charging is not PV coverage', () => {
   /* 1000 W PV: 200 into the battery, 300 exported → 500 W to Haus = 100 % */
   var hl = flowHeadline(hubFlows({ pv_w: 1000, bat_w: -200, grid_w: -300 }));
@@ -263,27 +230,6 @@ test('flowHeadline: unknown grid → unknown headline', () => {
 
 test('flowHeadline: no sample → null', () => {
   assert.strictEqual(flowHeadline(null), null);
-});
-
-/* =============== vzevPowerNow (FR-1003) =============== */
-
-test('vzevPowerNow: null without members', () => {
-  assert.strictEqual(vzevPowerNow([]), null);
-  assert.strictEqual(vzevPowerNow(null), null);
-});
-
-test('vzevPowerNow: net of newest slot × 4, signed by member role', () => {
-  /* producer member feeds this site (+import), newest slot ts=900 delivers 100 Wh */
-  var members = [
-    { id: 'p', net_wh: 300, points: [{ t: 0, y: 50 }, { t: 900, y: 100 }] },
-    { id: 'c', net_wh: -80, points: [{ t: 0, y: 20 }, { t: 900, y: 30 }] }
-  ];
-  /* newest slot net = +100 (import) − 30 (export) = 70 Wh → ×4 = 280 W */
-  assert.strictEqual(vzevPowerNow(members), 280);
-});
-
-test('vzevPowerNow: no closed slot → null', () => {
-  assert.strictEqual(vzevPowerNow([{ id: 'p', net_wh: 0, points: [] }]), null);
 });
 
 /* =============== sourcesNow / sourcesToday (FR-1006) =============== */
@@ -324,13 +270,6 @@ test('sourcesNow: battery discharge + grid import, no PV → usage not empty (is
   assert.strictEqual(u['comp.feedin'], 0);
 });
 
-test('sourcesNow: vZEV share caps at import; rest to Netz', () => {
-  var r = sourcesNow({ pv_w: 0, bat_w: 0, grid_w: 500 }, 200);
-  var c = segMap(r.cover);
-  assert.strictEqual(c['comp.vzev'], 200);
-  assert.strictEqual(c['comp.grid'], 300);
-});
-
 test('sourcesNow: null pv → unknown, no fabricated Netz share', () => {
   var r = sourcesNow({ pv_w: null, bat_w: 0, grid_w: 500 });
   assert.strictEqual(r.unknown, true);
@@ -345,16 +284,15 @@ test('sourcesNow: segments never negative (export skew)', () => {
 
 test('sourcesToday: no battery Wh → no battery segments, sums complete slots', () => {
   var r = sourcesToday([
-    rec({ pv_wh: 1000, exp_wh: 400, imp_wh: 200, vzev_in_wh: 50, vzev_out_wh: 100 }),
-    rec({ pv_wh: 1000, exp_wh: 400, imp_wh: 200, vzev_in_wh: 50, vzev_out_wh: 100 })
+    rec({ pv_wh: 1000, exp_wh: 400, imp_wh: 200 }),
+    rec({ pv_wh: 1000, exp_wh: 400, imp_wh: 200 })
   ]);
   var c = segMap(r.cover), u = segMap(r.usage);
   assert.strictEqual(c['comp.battery'], undefined, 'no battery in Heute');
   assert.strictEqual(u['comp.charge'], undefined, 'no battery in Heute');
   assert.strictEqual(c['comp.pv'], 1200);        /* selfuse = pv − exp */
-  assert.strictEqual(c['comp.vzev'], 100);       /* vin summed */
-  assert.strictEqual(c['comp.grid'], 300);       /* imp − vin */
-  assert.strictEqual(u['comp.feedin'], 600);     /* exp − vout */
+  assert.strictEqual(c['comp.grid'], 400);       /* imp summed */
+  assert.strictEqual(u['comp.feedin'], 800);     /* exp summed */
 });
 
 test('sourcesToday: battery segments once the records carry battery Wh (issue #20)', () => {
@@ -376,7 +314,7 @@ test('sourcesToday: without battery Wh the bars keep their shape', () => {
   var r = sourcesToday([rec({ pv_wh: 1000, exp_wh: 400, imp_wh: 200 })]);
   assert.strictEqual(r.battery, false);
   assert.deepStrictEqual(r.cover.map(function (s) { return s.key; }),
-                         ['comp.pv', 'comp.vzev', 'comp.grid']);
+                         ['comp.pv', 'comp.grid']);
 });
 
 test('kpis / balance count the battery into the consumption (issue #20)', () => {

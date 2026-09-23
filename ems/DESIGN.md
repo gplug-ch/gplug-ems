@@ -1,5 +1,5 @@
 ---
-name: vZEV Energy Management UI
+name: gPlug EMS UI
 description: The on-device gPlug EMS dashboard — a warm-paper, provenance-first energy ledger
 colors:
   cream-bg: "#F3EFE2"
@@ -11,11 +11,11 @@ colors:
   line: "#E3DED0"
   production: "#D99A06"
   consumption: "#2D9CDB"
-  vzev: "#3E7C28"
+  export: "#3E7C28"
   import: "#C62D20"
   battery: "#0F766E"
   import-fill: "#F5C1BC"
-  vzev-fill: "#C4E3C9"
+  export-fill: "#C4E3C9"
   active: "#2FA452"
   inactive: "#6B6B77"
 typography:
@@ -104,7 +104,7 @@ components:
     padding: "10px 14px"
 ---
 
-# Design System: vZEV Energy Management UI
+# Design System: gPlug EMS UI
 
 ## Overview
 
@@ -169,12 +169,11 @@ literal on purpose — the Swiss colour convention must stay unmistakable.
 These map 1:1 to concepts and follow the Swiss/DACH convention. Treat them as reserved.
 - **Production** (#D99A06): PV / Erzeugung — Gelb/Ocker. Card-edge for Erzeuger.
 - **Consumption** (#2D9CDB): Verbrauch / Haus / Lasten — Blau. Card-edge for Lasten.
-- **vZEV** (#3E7C28): Netzeinspeisung + shared community energy — Grün. Card-edge for vZEV;
-  positive/credit values in tables.
+- **Export** (#3E7C28): Netzeinspeisung — Grün. Positive/credit values in tables.
 - **Import** (#C62D20): Netzbezug — Rot. Negative/debit values, danger buttons, field errors.
   Darkened for AA 4.5:1 (FR-209).
 - **Battery** (#0F766E): Batterie — Türkis/Petrol (AA 5.5:1 on white).
-- **Import Fill** (#F5C1BC) / **vZEV Fill** (#C4E3C9): the pale tints used for the lighter
+- **Import Fill** (#F5C1BC) / **Export Fill** (#C4E3C9): the pale tints used for the lighter
   segment of composition bars and chips.
 - **Active** (#2FA452) / **Inactive** (#6B6B77): load-state badge fills.
 
@@ -232,7 +231,6 @@ Content is organised as a vertical stack of cards, with purpose-built grids insi
 - **Übersicht sub-grid:** 2-up (`repeat(2, minmax(0,1fr))`), stacks to 1 column ≤767px.
 - **Settings form:** `auto-fill, minmax(240px, 1fr)`; a **master–detail** split of `260px 1fr`
   that becomes a list→detail push-navigation view with a back affordance ≤767px.
-- **Billing grid:** `auto-fill, minmax(320px, 1fr)`, one member statement per print page.
 
 The spacing rhythm is quiet and consistent: 6/10/16/20/32px. Cards carry 18–20px internal
 padding (14px on mobile); sections breathe with ~20–22px gaps. Wide content (tables, meter
@@ -262,13 +260,13 @@ edge** that gives every card its domain identity.
 elevation tier; hierarchy comes from the colour-coded left edge, hairlines, and paper contrast.
 
 **The Colour-Edge Rule.** A card's identity is its 4px left border: Netz = Navy, Erzeuger =
-Production gold, Lasten = Consumption blue, vZEV = vZEV green. Warning/hint surfaces use an
+Production gold, Lasten = Consumption blue. Warning/hint surfaces use an
 amber left edge on a pale-amber (#FCF3DC) wash.
 
 ## Shapes
 
 Gently rounded, calm geometry. Three corner radii and a pill:
-- **Cards / member nodes** — 12px (`--radius`, "md").
+- **Cards / flow nodes** — 12px (`--radius`, "md").
 - **Buttons, fields, sub-panels, banners** — 10px (`--radius-s`, "sm").
 - **Small controls** (icon buttons, nav-item, tooltip, segmented toggle, provenance tags) — 8px.
 - **Badges, filter pills, name tags, status dots** — full pill (999px) or circle.
@@ -286,7 +284,7 @@ exact padding, calm colour, no unnecessary motion. Transitions are short (0.15s)
 - **Shape:** 10px radius (`--radius-s`), min-height 40px (32px for `.btn-small`).
 - **Primary:** Amber fill, Navy text, padding 10px 22px. The single high-emphasis action per view.
 - **Secondary:** Navy fill, cream (#F7F3E5) text — the workhorse for neutral actions.
-- **Danger:** Import red fill, white text — destructive only (remove member, delete load).
+- **Danger:** Import red fill, white text — destructive only (delete load, delete production).
 - **Hover / Active:** `filter: brightness(0.95)` on hover; `translateY(1px)` on press. Disabled
   drops to 0.45 opacity. Focus shows the amber 2px ring (`:focus-visible`).
 
@@ -326,7 +324,7 @@ exact padding, calm colour, no unnecessary motion. Transitions are short (0.15s)
   when new numeric surfaces are added.
 
 ### Energy Flow Diagram (signature)
-- Hand-rolled SVG (no chart library), sharing the node/edge language of the vZEV community graph.
+- Hand-rolled SVG (no chart library) with its own node/edge language.
 - Live edges animate a dash drift *in the flow direction* (`flow-dash`, 0.9s); unknown edges use
   a sparse dash; the battery node slides between its source/sink slot rather than jumping.
 - A **words-first status headline** sits above the diagram, and every edge label is redundant

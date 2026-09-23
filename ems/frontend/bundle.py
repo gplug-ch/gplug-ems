@@ -37,9 +37,6 @@ ORDER = [
     'lib/aggregate.js',
     'lib/csv.js',
     'pages/uebersicht.js',
-    'pages/abrechnung.js',
-    #'pages/vzev.js',
-    #'pages/vzev_member.js',
     'pages/einstellungen.js',
     #'pages/verlauf.js',
     'main.js',
@@ -48,9 +45,9 @@ ORDER = [
 # quoted dotted strings with one of these prefixes count as i18n key references
 KEY_PREFIXES = (
     'nav', 'state', 'common', 'error', 'banner', 'table', 'page',
-    'placeholder', 'tooltip', 'panel', 'hint', 'billing', 'history',
-    'settings', 'vzev', 'demo', 'stat', 'action', 'kpi', 'flow',
-    'explain', 'tariff', 'comp', 'modbus',
+    'placeholder', 'tooltip', 'panel', 'hint', 'history',
+    'settings', 'demo', 'stat', 'action', 'kpi', 'flow',
+    'tariff', 'comp', 'modbus',
 )
 # a real key ends in an alphanumeric/underscore; a trailing dot means the
 # literal is a dynamic key *prefix* (e.g. 'settings.tab.' + tab) — not a key.

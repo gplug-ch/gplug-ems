@@ -62,30 +62,25 @@ The `<html lang>` attribute and the `self`/`dev` shell rewrites are done by a
 **Charts:** hand-rolled SVG (`charts.js` — `LineChart`, `BarChart`), no chart lib.
 
 **Chart sign convention (issue #17) — app-wide, no exceptions:** energy or money
-the site **gives** is drawn **above** the 0-axis (Einspeisung / vZEV-Abgabe,
+the site **gives** is drawn **above** the 0-axis (Einspeisung,
 green; a positive CHF saldo), energy or money it **takes** is drawn **below** it
 (Netzbezug, red; a negative CHF saldo). This holds for the Verlauf Netz mode
 (kWh and CHF), the Verlauf Bilanz stack — one signed stack per period, self-use
-drawn once — and the Übersicht vZEV per-member charts. `BarChart` takes
+drawn once. `BarChart` takes
 `signedMagnitude` when the sign is a *direction* rather than the quantity: the
 tooltip then prints `|value|` next to the point's/segment's own label (kWh
 views). CHF views leave it off, because there the sign is the value itself. The
-underlying data keeps its own conventions (`grid_w` > 0 = import, `m.points`
-unsigned) — the direction is applied at the render site, never in the libs.
+underlying data keeps its own conventions (`grid_w` > 0 = import) — the direction is applied at the render site, never in the libs.
 
 **Browser archive (spec 011 step 3a):** `src/lib/archive.js` mirrors the device's
-raw 15-min records and raw vZEV peer slots into IndexedDB (`gplug-archive`,
-stores `e15` / `vz15` / `meta` / `live`, keyed by the `/site` id — never the origin) and
+raw 15-min records into IndexedDB (`gplug-archive`,
+stores `e15` / `meta` / `live`, keyed by the `/site` id — never the origin) and
 is the ONLY module touching IndexedDB; the pure libs never import it. `main.js`
 calls `archive.start(api)` at boot, which syncs incrementally
-(`GET /api/energy?res=15m&count=384&from=<last+900>` pages, plus one
-`/api/vzev/raw`) and re-syncs every 15 min. Pages `await archive.ready()` and
-read `archive.range()` / `archive.rawRange()`; `verlauf.js` derives every
+(`GET /api/energy?res=15m&count=384&from=<last+900>` pages) and re-syncs every 15 min. Pages `await archive.ready()` and
+read `archive.range()`; `verlauf.js` derives every
 resolution from 15-min records (the device's `res=1d|1mo` rings are gone as of
-spec 011 step 3b — `/api/energy` answers 400 for anything but `15m`),
-`abrechnung.js` settles the whole quarter, and `lib/vzev.js`
-`ownShare()/withOwnShare()` recompute the per-slot `vzev_in_wh`/`vzev_out_wh`
-the device used to write back. If IndexedDB is unavailable, every page falls
+spec 011 step 3b — `/api/energy` answers 400 for anything but `15m`). If IndexedDB is unavailable, every page falls
 back to the live device buffer — which now reaches back 30 days, not 18 months —
 and the shell shows the `banner.archive` warning. Coverage, gaps and CSV export/import live in
 the Einstellungen «Daten» tab.

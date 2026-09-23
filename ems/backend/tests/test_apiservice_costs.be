@@ -38,8 +38,6 @@ var t = site.get_tariffs()
 assert(approx(t['grid_import_chf_kwh'], 0.26), "default import tariff wrong")
 assert(approx(t['grid_feedin_chf_kwh'], 0.18), "default feed-in tariff wrong")
 assert(approx(t['base_fee_chf_month'], 12.5), "default base fee wrong")
-assert(approx(t['vzev_export_chf_kwh'], 0.22), "default vzev export tariff wrong")
-assert(approx(t['vzev_import_chf_kwh'], 0.22), "default vzev import tariff wrong")
 print("Test 1 passed: tariff defaults for config without tariffs key")
 
 print("")

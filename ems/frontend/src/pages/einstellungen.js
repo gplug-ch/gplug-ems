@@ -9,21 +9,20 @@ import { api } from '../api.js';
 import { router } from '../router.js';
 import { toast } from '../components.js';
 import * as ui from '../ui.js';
-import { capReference, hasHtNt } from '../lib/vzev.js';
 import { fmt } from '../format.js';
 import * as archive from '../lib/archive.js';
 
-  var TABS = ['site', 'loads', 'productions', 'grid', 'modbus', 'tariffs', 'vzev', 'daten', 'gplug', 'pro'];
+  var TABS = ['site', 'loads', 'productions', 'grid', 'modbus', 'tariffs', 'daten', 'gplug', 'pro'];
   /* URL slug ⇄ internal tab key. German slugs are the canonical route
      (#/einstellungen/tarife); English internal keys drive the logic. */
-  var SLUG = { site: 'site', lasten: 'loads', produktion: 'productions', netzanschluss: 'grid', modbus: 'modbus', tarife: 'tariffs', vzev: 'vzev', daten: 'daten', gplug: 'gplug', pro: 'pro' };
-  var TAB_SLUG = { site: 'site', loads: 'lasten', productions: 'produktion', grid: 'netzanschluss', modbus: 'modbus', tariffs: 'tarife', vzev: 'vzev', daten: 'daten', gplug: 'gplug', pro: 'pro' };
+  var SLUG = { site: 'site', lasten: 'loads', produktion: 'productions', netzanschluss: 'grid', modbus: 'modbus', tarife: 'tariffs', daten: 'daten', gplug: 'gplug', pro: 'pro' };
+  var TAB_SLUG = { site: 'site', loads: 'lasten', productions: 'produktion', grid: 'netzanschluss', modbus: 'modbus', tariffs: 'tarife', daten: 'daten', gplug: 'gplug', pro: 'pro' };
   /* full literal keys so bundle.py's i18n check can see the references */
   var TAB_LABEL = {
     site: 'settings.tab.site', loads: 'settings.tab.loads',
     productions: 'settings.tab.productions', grid: 'settings.tab.grid',
     modbus: 'settings.tab.modbus',
-    tariffs: 'settings.tab.tariffs', vzev: 'settings.tab.vzev',
+    tariffs: 'settings.tab.tariffs',
     daten: 'settings.tab.data',
     gplug: 'settings.tab.gplug', pro: 'settings.tab.pro'
   };
@@ -58,12 +57,10 @@ import * as archive from '../lib/archive.js';
   var ENERGY_DIMENSIONS = ['Wh', 'kWh'];
 
   var TARIFF_KEYS = [
-    'grid_import_chf_kwh', 'grid_feedin_chf_kwh', 'base_fee_chf_month',
-    'vzev_export_chf_kwh', 'vzev_import_chf_kwh'
+    'grid_import_chf_kwh', 'grid_feedin_chf_kwh', 'base_fee_chf_month'
   ];
   var TARIFF_DEFAULTS = {
     grid_import_chf_kwh: 0.26, grid_feedin_chf_kwh: 0.18, base_fee_chf_month: 12.5,
-    vzev_export_chf_kwh: 0.22, vzev_import_chf_kwh: 0.22,
     /* spec 008 FR-805: CO₂ factor g CO₂eq/kWh (Schweizer Verbrauchermix); 0 hides */
     co2_g_kwh: 128
   };
@@ -365,8 +362,7 @@ import * as archive from '../lib/archive.js';
   /* every numeric tariff key the device used to bound (≥ 0 when present) */
   var DOC_TARIFF_KEYS = [
     'grid_import_chf_kwh', 'grid_feedin_chf_kwh', 'grid_import_ht_chf_kwh',
-    'grid_import_nt_chf_kwh', 'base_fee_chf_month', 'vzev_export_chf_kwh',
-    'vzev_import_chf_kwh', 'co2_g_kwh'
+    'grid_import_nt_chf_kwh', 'base_fee_chf_month', 'co2_g_kwh'
   ];
 
   /* modbustcp item (load/production/grid): "url" is host:port (no scheme),
@@ -982,16 +978,8 @@ export {
     var htBoth = isNum(tar.grid_import_ht_chf_kwh) && isNum(tar.grid_import_nt_chf_kwh);
     var winEmptyWarn = htBoth && wins.length === 0;
 
-    /* 80%-cap indicator (FR-905): computed from lib/vzev.js:capReference over
-       the coerced numeric tariffs; amber warning when the internal import
-       price exceeds it (never blocks — the Effektivmethode may justify more). */
-    var capTar = coerceTariffs(tar);
-    var capRef = capReference(capTar);
-    var vzevImp = Number(tar.vzev_import_chf_kwh);
-    var capExceeded = capRef !== null && !isNaN(vzevImp) && vzevImp > capRef;
-
     return html`
-      <${ui.Card} group="vzev">
+      <${ui.Card} group="grid">
         <div class="settings-subhead">${t('settings.tariff.grid_import_group')}</div>
         <div class="settings-form">
           <${Field} label=${t('settings.tariff.grid_import_chf_kwh')} type="number" step="0.01" min="0"
@@ -1031,21 +1019,6 @@ export {
           <${Field} label=${t('settings.tariff.base_fee_chf_month')} type="number" step="0.01" min="0"
             value=${tar.base_fee_chf_month} error=${errors.base_fee_chf_month} onInput=${set('base_fee_chf_month')} />
         </div>
-        <div class="settings-subhead">${t('settings.tariff.cap_group')}</div>
-        <div class="settings-form">
-          <${Field} label=${t('settings.tariff.vzev_export_chf_kwh')} type="number" step="0.01" min="0"
-            value=${tar.vzev_export_chf_kwh} error=${errors.vzev_export_chf_kwh} onInput=${set('vzev_export_chf_kwh')} />
-          <${Field} label=${t('settings.tariff.vzev_import_chf_kwh')} type="number" step="0.01" min="0"
-            value=${tar.vzev_import_chf_kwh} error=${errors.vzev_import_chf_kwh} onInput=${set('vzev_import_chf_kwh')} />
-        </div>
-        ${capRef !== null ? html`
-          <p class="settings-scope">
-            ${t('settings.tariff.cap_ref', { ref: capRef.toFixed(2) })}
-            <${ui.Tooltip} text=${t('tooltip.cap')} />
-          </p>
-          ${capExceeded
-            ? html`<p class="settings-warn">${t('settings.tariff.cap_warn')}</p>`
-            : html`<p class="settings-ok">${t('settings.tariff.cap_ok')}</p>`}` : null}
         <div class="settings-subhead">${t('settings.tariff.co2_group')}</div>
         <div class="settings-form">
           <${Field} label=${t('settings.tariff.co2_g_kwh')} type="number" step="1" min="0"
@@ -1056,99 +1029,8 @@ export {
   }
 
   /* small numeric coerce for input strings: '' -> undefined so an empty field
-     is treated as unset by capReference/hasHtNt (not 0). */
+     is treated as unset (not 0). */
   function num(v) { return isBlank(v) ? undefined : Number(v); }
-
-  /* coerce the tariff form (string inputs) to numbers for capReference/hasHtNt,
-     dropping blank optional keys so a half-filled HT/NT does not read as 0. */
-  function coerceTariffs(tar) {
-    var o = {};
-    ['grid_import_chf_kwh', 'grid_import_ht_chf_kwh', 'grid_import_nt_chf_kwh'].forEach(function (k) {
-      if (!isBlank(tar[k])) o[k] = Number(tar[k]);
-    });
-    if (Array.isArray(tar.ht_windows)) o.ht_windows = tar.ht_windows;
-    return o;
-  }
-
-  /* ---------- vZEV master-data tab (spec 009 UC-905 / FR-903) ----------
-     Independent of the config document: reads/writes /api/vzev/info and shows
-     read-only producer/member counts from /api/vzev/members. */
-  function VzevTab() {
-    var stInfo = useState(null);      /* {representative_name, ...} | null */
-    var info = stInfo[0], setInfo = stInfo[1];
-    var stCounts = useState({ producers: 0, members: 0 });
-    var counts = stCounts[0], setCounts = stCounts[1];
-    var stSaving = useState(false);
-    var saving = stSaving[0], setSaving = stSaving[1];
-
-    useEffect(function () {
-      var done = false;
-      Promise.all([
-        api.getVzevInfo().catch(function () { return {}; }),
-        /* vzevBypass: the counts stay truthful even while vZEV is switched
-           off — every other vZEV read is gated away in that state (api.js) */
-        api.get('/api/vzev/members', { optional: true, vzevBypass: true })
-          .catch(function () { return { members: [] }; })
-      ]).then(function (res) {
-        if (done) return;
-        var i = res[0] || {};
-        setInfo({
-          representative_name: i.representative_name || '',
-          representative_contact: i.representative_contact || '',
-          connection_point_id: i.connection_point_id || '',
-          enabled: !!i.enabled
-        });
-        var mem = (res[1] && res[1].members) || [];
-        var prod = 0;
-        mem.forEach(function (m) { if (m.type === 'PRODUCER' || m.typ === 'P') prod++; });
-        setCounts({ producers: prod, members: mem.length });
-      });
-      return function () { done = true; };
-    }, []);
-
-    function set(k) { return function (v) { setInfo(function (p) { var n = Object.assign({}, p); n[k] = v; return n; }); }; }
-
-    function save() {
-      if (saving || !info) return;
-      setSaving(true);
-      api.setVzevInfo(info)
-        .then(function () { toast(t('settings.vzev.saved'), { type: 'info' }); })
-        .catch(function () { toast(t('settings.save_error'), { type: 'error' }); })
-        .then(function () { setSaving(false); });
-    }
-
-    if (!info) {
-      return html`<${ui.Card} group="vzev"><p class="placeholder-text">${t('settings.loading')}</p><//>`;
-    }
-    return html`
-      <${ui.Card} group="vzev">
-        <div class="settings-form settings-toggle-row">
-          <label class="toggle-wrap">
-            <input type="checkbox" class="toggle" checked=${info.enabled}
-              onChange=${function (e) { set('enabled')(e.target.checked); }} />
-            <span>${t('settings.vzev.enabled')}</span>
-          </label>
-        </div>
-        <p class="settings-scope">${t('settings.vzev.enabled_hint')}</p>
-        <p class="settings-scope">${t('settings.vzev.subtitle')}</p>
-        <div class="settings-form">
-          <label class="field field-block">
-            <span class="field-label">${t('settings.vzev.representative_name')} <${ui.Tooltip} text=${t('tooltip.vertreter')} /></span>
-            <input class="textfield" type="text" value=${info.representative_name}
-              onInput=${function (e) { set('representative_name')(e.target.value); }} />
-          </label>
-          <${Field} label=${t('settings.vzev.representative_contact')}
-            value=${info.representative_contact} onInput=${set('representative_contact')} />
-          <label class="field field-block">
-            <span class="field-label">${t('settings.vzev.connection_point_id')} <${ui.Tooltip} text=${t('tooltip.connpoint')} /></span>
-            <input class="textfield" type="text" value=${info.connection_point_id}
-              onInput=${function (e) { set('connection_point_id')(e.target.value); }} />
-          </label>
-        </div>
-        <p class="settings-scope">${t('settings.vzev.counts', { producers: counts.producers, members: counts.members })}</p>
-        <${SaveBar} disabled=${false} onSave=${save} saving=${saving} />
-      <//>`;
-  }
 
   /* ---------- gPlug tab (device-level Tasmota operations) ----------
      Independent of the config document: talks straight to Tasmota's own
@@ -1723,8 +1605,6 @@ export {
     } else if (tab === 'tariffs') {
       body = html`<${TariffsTab} tariffs=${cfg.tariffs} patch=${patchTariff}
         setWindows=${setWindows} onSave=${save} saving=${saving} />`;
-    } else if (tab === 'vzev') {
-      body = html`<${VzevTab} />`;
     } else if (tab === 'daten') {
       body = html`<${DatenTab} />`;
     } else if (tab === 'gplug') {

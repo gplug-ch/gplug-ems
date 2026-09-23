@@ -15,7 +15,7 @@ No test runner is configured yet.
 
 ## Architecture
 
-React 19 + Vite 7 single-page application that serves as the **Frontend Simulator** for the VZEV (Virtual Zero Energy Vehicle) project. It is served by the Spring Boot backend (`../backend`) and polls its REST API to display and control energy loads.
+React 19 + Vite 7 single-page application that serves as the **Frontend Simulator** for the gPlug EMS project. It is served by the Spring Boot backend (`../backend`) and polls its REST API to display and control energy loads.
 
 **Planned features (from design docs):**
 - Multi-site tabs — one tab per site, plus an overview of all active loads across sites
