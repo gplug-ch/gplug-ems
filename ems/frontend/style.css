@@ -1495,6 +1495,8 @@ html, body {
 .settings-warn-list { margin: 6px 0; padding-left: 18px; }
 .settings-warn-list code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
 .ht-window-row { align-items: flex-end; }
+.modbus-test-result { margin-top: 14px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.modbus-test-result code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
 
 /* ================= Print view (spec 009 FR-907) ================= */
 /* PDF via the browser print dialog, no libraries; hide chrome and

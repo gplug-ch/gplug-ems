@@ -20,5 +20,9 @@
   "grid": [
     {"id": "from", "integration": "modbustcp", "url": "10.0.0.9:502",
      "function": 4, "register": 300, "dtype": "int32"}
+  ],
+  "modbusRegisters": [
+    {"id": "static", "integration": "modbustcp", "url": "10.0.0.9:502",
+     "function": 3, "register": 1001, "dtype": "float32"}
   ]
 }

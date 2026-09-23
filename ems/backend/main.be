@@ -145,6 +145,28 @@ _config_stub_web = def ()
     end
 end
 
+# --- lazy modbusservice (issue #20) ------------------------------------------
+# Manual Modbus register read/write for the Einstellungen test panel. Only
+# the two routes live here; the module (and modbustcp, if no item uses it) is
+# imported on the first request, so no bytecode sits in RAM until someone
+# opens the panel. The driver re-registers the routes on a web restart.
+_modbus_stub_driver = nil
+
+_modbus_stub_web = def ()
+    try
+        import webserver
+        webserver.on('/api/modbus/read', def ()
+            import modbusservice
+            modbusservice.readrequest()
+        end, webserver.HTTP_GET)
+        webserver.on('/api/modbus/write', def ()
+            import modbusservice
+            modbusservice.writerequest()
+        end, webserver.HTTP_POST)
+    except ..
+    end
+end
+
 _net_ready = def()
     var w = tasmota.wifi()
     if w == nil
@@ -198,6 +220,13 @@ start_services = def(net_up)
         logger.logMsg(logger.lInfo, "ConfigService stub on /api/config (module loads on first POST)")
     end)
 
+    # Manual Modbus read/write (issue #20) — LAZY like configservice
+    _stage("modbusservice stub", def()
+        _modbus_stub_driver = drivershim.make({'web_add_handler': _modbus_stub_web})
+        tasmota.add_driver(_modbus_stub_driver)
+        _modbus_stub_web()
+    end)
+
     # Load site configuration FIRST (builds loads/productions/grid item maps
     # from site.json; live values are filled lazily by the poll scheduler, no
     # boot fetch burst).
@@ -231,6 +260,11 @@ stop_services = def()
     if _config_stub_driver != nil
         tasmota.remove_driver(_config_stub_driver)
         _config_stub_driver = nil
+    end
+
+    if _modbus_stub_driver != nil
+        tasmota.remove_driver(_modbus_stub_driver)
+        _modbus_stub_driver = nil
     end
 
     # Stop EMS driver
