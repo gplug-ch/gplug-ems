@@ -18,7 +18,7 @@ and the frontend can be developed on your laptop against a real device.
 | Tool | Used for | Notes |
 |------|----------|-------|
 | `make`, `zip`, `python3` | building the `.tapp` | `python3` runs `minify.py` and `bundle.py` |
-| [Berry CLI](https://github.com/berry-lang/berry) (`berry`) | running the backend tests | 1.1.0; build it once from source, put it on `$PATH` |
+| [Berry CLI](https://github.com/berry-lang/berry) (`berry`) | running the backend tests | build it once from `master` (the `v1.1.0` tag lacks the `-m` option the tests use; CI pins a commit in `.github/workflows/ci.yml`), put it on `$PATH` |
 | Node.js + npm | frontend dev server and Vite build | Node 20+ |
 | `curl` | `make flash` | talks to the device's Tasmota HTTP API |
 | A gPlug (ESP32-C3) with Tasmota | running the backend | any Tasmota build with Berry + the filesystem; **no `USE_CORS`** — see [CORS](#cors) |
