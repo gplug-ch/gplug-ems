@@ -1,0 +1,94 @@
+{
+  "id": "site-2",
+  "name": "Site 2",
+  "location": "Dormenstrasse 27, Horw",
+  "description": "Demo Site",
+  "grid": [
+    {
+      "id": "from",
+      "integration": "gplug",
+      "dimension": "W",
+      "field": "Pi"
+    },
+    {
+      "id": "to",
+      "integration": "gplug",
+      "dimension": "W",
+      "field": "Po"
+    }
+  ],
+  "productions": [
+    {
+      "id": "pv-2",
+      "friendlyName": "PV",
+      "productionType": "PHOTOVOLTAIC",
+      "integration": "homeassistant",
+      "dimension": "kW",
+      "url": "http://192.168.0.138:8123/api/states/sensor.energyproduceractual_2",
+      "token": "<HA long-lived access token>"
+    },
+    {
+      "id": "pv-sma",
+      "friendlyName": "PV SMA",
+      "productionType": "PHOTOVOLTAIC",
+      "integration": "gplug",
+      "sensor": "SMA",
+      "field": "P_AC",
+      "scale_field": "Psf",
+      "scale_base": 1,
+      "max_power": 20000,
+      "energy_field": "E_AC",
+      "stale_after": 600,
+      "dimension": "kW"
+    },
+    {
+      "id": "battery-sma",
+      "friendlyName": "Batterie",
+      "productionType": "BATTERY",
+      "integration": "gplug",
+      "sensor": "BAT",
+      "field": "W",
+      "max_power": 12000,
+      "soc_field": "ChaState",
+      "soc_scale_field": "ChaState_SF",
+      "capacity": 10000,
+      "maxChargePower": 5000,
+      "maxDischargePower": 5000
+    }
+  ],
+  "loads": [
+    {
+      "id": "heatpump-2",
+      "friendlyName": "Heat Pump",
+      "loadType": "HEATPUMP",
+      "priority": 1,
+      "duration": 3600,
+      "minimalDuration": 900,
+      "currentPower": 2000,
+      "integration": "simulator",
+      "url": "http://192.168.0.193:9090/simulator/sites/site-2/loads/heatpump-2"
+    },
+    {
+      "id": "dryer-2",
+      "friendlyName": "Dryer",
+      "loadType": "DRYER",
+      "priority": 3,
+      "duration": 2400,
+      "minimalDuration": 0,
+      "currentPower": 1000,
+      "integration": "simulator",
+      "url": "http://192.168.0.193:9090/simulator/sites/site-2/loads/dryer-2"
+    },
+    {
+      "id": "wallbox-2",
+      "friendlyName": "EV Charger",
+      "loadType": "WALLBOX",
+      "priority": 2,
+      "currentPower": 6000,
+      "duration": 7200000,
+      "minimalDuration": 1800000,
+      "integration": "simulator",
+      "url": "http://192.168.0.193:9090/simulator/sites/site-2/loads/wallbox-2"
+    }
+  ]
+}

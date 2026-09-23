@@ -1,0 +1,14 @@
+{
+  "id": "s", "name": "battery fixture",
+  "loads": [],
+  "productions": [
+    {"id": "bat-1", "productionType": "BATTERY", "capacity": 10000,
+     "integration": "homeassistant", "dimension": "kW",
+     "url": "http://ha/api/states/sensor.speicher_leistung",
+     "soc_url": "http://ha/api/states/sensor.speicher_ladestand",
+     "token": "t"},
+    {"id": "bat-2", "productionType": "BATTERY", "invert": true,
+     "integration": "homeassistant",
+     "url": "http://ha/api/states/sensor.bat2_power"}
+  ]
+}

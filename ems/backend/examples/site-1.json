@@ -1,0 +1,88 @@
+{
+  "id": "site-1",
+  "name": "Site 1",
+  "location": "Bahnhofstrasse 77, Bern",
+  "description": "Demo Site",
+  "productions": [
+    {
+      "id": "pv-1",
+      "friendlyName": "PV",
+      "productionType": "PHOTOVOLTAIC",
+      "dimension": "kW",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/productions/pv-1"
+    },
+    {
+      "id": "battery-1",
+      "friendlyName": "Battery",
+      "productionType": "BATTERY",
+      "capacity": 10000,
+      "maxChargePower": 5000,
+      "maxDischargePower": 5000,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/productions/battery-1"
+    }
+  ],
+  "grid": [
+    {
+      "id": "from",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/grid/input"
+    },
+    {
+      "id": "to",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/grid/output"
+    }
+  ],
+  "loads": [
+    {
+      "id": "boiler-1",
+      "friendlyName": "Boiler",
+      "loadType": "ELECTRICITY",
+      "integration": "shelly",
+      "currentPower": 500,
+      "priority": 2,
+      "url": {
+        "on": "http://192.168.0.148/relay/0?turn=on",
+        "off": "http://192.168.0.148/relay/0?turn=off",
+        "status": "http://192.168.0.194:9090/simulator/sites/site-1/loads/boiler-1"
+      }
+    },
+    {
+      "id": "heatpump-1",
+      "friendlyName": "Heat Pump",
+      "loadType": "HEATPUMP",
+      "priority": 1,
+      "duration": 3600,
+      "minimalDuration": 900,
+      "currentPower": 2000,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/loads/heatpump-1"
+    },
+    {
+      "id": "dryer-1",
+      "friendlyName": "Dryer",
+      "loadType": "DRYER",
+      "priority": 3,
+      "duration": 2400,
+      "currentPower": 1000,
+      "minimalDuration": 0,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/loads/dryer-1"
+    },
+    {
+      "id": "wallbox-1",
+      "friendlyName": "EV Charger",
+      "loadType": "WALLBOX",
+      "priority": 2,
+      "duration": 7200000,
+      "minimalDuration": 1800000,
+      "currentPower": 6000,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/loads/wallbox-1"
+    }
+  ]
+}

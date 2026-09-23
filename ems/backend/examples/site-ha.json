@@ -1,0 +1,94 @@
+{
+  "id": "site-1",
+  "name": "Site 1",
+  "location": "Bahnhofstrasse 77, Bern",
+  "description": "Demo Site",
+  "productions": [
+    {
+      "id": "pv-1",
+      "friendlyName": "PV",
+      "productionType": "PHOTOVOLTAIC",
+      "dimension": "kW",
+      "integration": "homeassistant",
+      "url": "http://192.168.0.138:8123/api/states/sensor.pv_leistung",
+      "token": "<HA long-lived access token>"
+    },
+    {
+      "id": "battery-1",
+      "friendlyName": "Speicher",
+      "productionType": "BATTERY",
+      "dimension": "kW",
+      "integration": "homeassistant",
+      "url": "http://192.168.0.138:8123/api/states/sensor.speicher_leistung",
+      "soc_url": "http://192.168.0.138:8123/api/states/sensor.speicher_ladestand",
+      "token": "<HA long-lived access token>",
+      "capacity": 10000,
+      "maxChargePower": 10000,
+      "maxDischargePower": 10000
+    }
+  ],
+  "grid": [
+    {
+      "id": "from",
+      "dimension": "kW",
+      "integration": "homeassistant",
+      "url": "http://192.168.0.138:8123/api/states/sensor.bezug_ew_actual",
+      "token": "<HA long-lived access token>"
+    },
+    {
+      "id": "to",
+      "dimension": "kW",
+      "integration": "homeassistant",
+      "url": "http://192.168.0.138:8123/api/states/sensor.lieferung_ew_actual",
+      "token": "<HA long-lived access token>"
+    }
+  ],
+  "loads": [
+    {
+      "id": "boiler-1",
+      "friendlyName": "Boiler",
+      "loadType": "ELECTRICITY",
+      "integration": "shelly",
+      "currentPower": 500,
+      "priority": 2,
+      "url": {
+        "on": "http://192.168.0.148/relay/0?turn=on",
+        "off": "http://192.168.0.148/relay/0?turn=off",
+        "status": "http://192.168.0.193:9090/simulator/sites/site-1/loads/boiler-1"
+      }
+    },
+    {
+      "id": "heatpump-1",
+      "friendlyName": "Heat Pump",
+      "loadType": "HEATPUMP",
+      "priority": 1,
+      "duration": 3600,
+      "minimalDuration": 900,
+      "currentPower": 2000,
+      "integration": "simulator",
+      "url": "http://192.168.0.193:9090/simulator/sites/site-1/loads/heatpump-1"
+    },
+    {
+      "id": "dryer-1",
+      "friendlyName": "Dryer",
+      "loadType": "DRYER",
+      "priority": 3,
+      "duration": 2400,
+      "currentPower": 1000,
+      "minimalDuration": 0,
+      "integration": "simulator",
+      "url": "http://192.168.0.193:9090/simulator/sites/site-1/loads/dryer-1"
+    },
+    {
+      "id": "wallbox-1",
+      "friendlyName": "EV Charger",
+      "loadType": "WALLBOX",
+      "priority": 2,
+      "duration": 7200000,
+      "minimalDuration": 1800000,
+      "currentPower": 6000,
+      "integration": "simulator",
+      "url": "http://192.168.0.193:9090/simulator/sites/site-1/loads/wallbox-1"
+    }
+  ]
+}

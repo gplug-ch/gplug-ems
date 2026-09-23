@@ -1,0 +1,1 @@
+{"id":"s","name":"n","loads":[{"id":"load-a","name":"boiler","currentPower":3000,"priority":1},{"id":"load-b","name":"heatpump","currentPower":2000,"priority":2},{"id":"load-c","name":"dishwasher","currentPower":2500,"priority":3}],"productions":[{"id":"pv-1","name":"pv","currentPower":0}]}

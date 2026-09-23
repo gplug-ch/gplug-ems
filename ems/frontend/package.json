@@ -1,0 +1,26 @@
+{
+  "name": "gplug-ems-frontend",
+  "private": true,
+  "version": "0.4.1",
+  "type": "module",
+  "description": "vZEV EMS web UI (Preact + HTM), built with Vite and served from a CDN (GitHub Pages) or self-hosted.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:self": "ASSET_BASE=self vite build",
+    "build:dev": "ASSET_BASE=dev vite build",
+    "preview": "vite preview",
+    "deploy": "scripts/deploy-gh-pages.sh",
+    "deploy:cloudflare": "wrangler pages deploy dist --project-name=${PAGES_PROJECT:-gplug}",
+    "test": "node --test 'tests/**/*.mjs'"
+  },
+  "dependencies": {
+    "htm": "^3.1.1",
+    "preact": "^10.26.9"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "vite": "^6.3.5",
+    "wrangler": "^4.122.0"
+  }
+}

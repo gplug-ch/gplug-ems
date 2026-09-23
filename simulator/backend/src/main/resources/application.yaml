@@ -1,0 +1,124 @@
+spring:
+  application:
+    name: simulator
+  docker:
+    compose:
+      lifecycle-management: none
+server:
+  servlet:
+    context-path: /simulator
+  port: 9090
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+logging:
+  level:
+    ch.gplug.simulator: DEBUG
+simulator:
+  sites:
+    - id: "site-1"
+      name: "Site 1"
+      grid:
+        input:
+          id: "in" # IMPORTANT set this id name.
+          name: "Grid Import"
+        output:
+          id: "out"  # IMPORTANT set this id name.
+          name: "Grid Export"
+      productions:
+        - id: "pv-1"
+          productionType: PHOTOVOLTAIC
+          maxPower: 50000
+        - id: "battery-1"
+          productionType: BATTERY
+          maxPower: 10000        # max discharge W
+          maxChargePower: 10000
+          capacityWh: 10000
+          initialSoc: 50
+      loads:
+        - id: "boiler-1"
+          friendlyName: "Boiler"
+          loadType: BOILER
+          priority: 1
+          duration: 1800
+          minimalDuration: 600
+        - id: "heatpump-1"
+          friendlyName: "Heat Pump"
+          loadType: HEATPUMP
+          priority: 1
+          duration: 3600
+          minimalDuration: 900
+        - id: "wallbox-1"
+          friendlyName: "EV Charger"
+          loadType: WALLBOX
+          priority: 2
+          duration: 7200
+          minimalDuration: 1800
+        - id: "dryer-1"
+          friendlyName: "Dryer"
+          loadType: DRYER
+          priority: 3
+          duration: 2400
+          minimalDuration: 0
+    - id: "site-2"
+      name: "Site 2"
+      grid:
+        input:
+          id: "grid-input-2"
+          name: "Grid Import"
+        output:
+          id: "grid-output-2"
+          name: "Grid Export"
+      loads:
+        - id: "boiler-2"
+          friendlyName: "Boiler"
+          loadType: BOILER
+          priority: 1
+          duration: 1800
+          minimalDuration: 600
+        - id: "heatpump-2"
+          friendlyName: "Heat Pump"
+          loadType: HEATPUMP
+          priority: 1
+          duration: 3600
+          minimalDuration: 900
+        - id: "wallbox-2"
+          friendlyName: "EV Charger"
+          loadType: WALLBOX
+          priority: 2
+          duration: 7200
+          minimalDuration: 1800
+        - id: "dryer-2"
+          friendlyName: "Dryer"
+          loadType: DRYER
+          priority: 3
+          duration: 2400
+          minimalDuration: 0
+    - id: "site-3"
+      name: "Site 3"
+      grid:
+        input:
+          id: "grid-input-3"
+          name: "Grid Import"
+        output:
+          id: "grid-output-3"
+          name: "Grid Export"
+      loads:
+        - id: "boiler-3"
+          friendlyName: "Boiler"
+          loadType: BOILER
+          priority: 1
+          duration: 1800
+          minimalDuration: 600
+        - id: "heatpump-3"
+          friendlyName: "Heat Pump"
+          loadType: HEATPUMP
+          priority: 1
+          duration: 3600
+          minimalDuration: 900
+        - id: "dryer-3"
+          friendlyName: "Dryer"
+          loadType: DRYER
+          priority: 3
+          duration: 2400
+          minimalDuration: 0

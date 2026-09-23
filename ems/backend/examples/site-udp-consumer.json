@@ -1,0 +1,71 @@
+{
+  "id": "site-3",
+  "name": "Site 3",
+  "location": "Riedstrasse 12, Emmen",
+  "description": "Demo Site — UDP integration: productions received via UDP multicast",
+  "messaging": {
+    "udp": {
+      "multicast_ip": "239.3.0.1",
+      "port": 5007
+    }
+  },
+  "productions": [
+    {
+      "id": "site-1",
+      "friendlyName": "Site 1",
+      "productionType": "PHOTOVOLTAIC",
+      "integration": "udp",
+      "url": "192.168.0.201",
+      "field": "power"
+    }
+  ],
+  "grid": [
+    {
+      "id": "from",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-2/grid/input"
+    },
+    {
+      "id": "to",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-2/grid/output"
+    }
+  ],
+  "loads": [
+    {
+      "id": "heatpump-2",
+      "friendlyName": "Heat Pump",
+      "loadType": "HEATPUMP",
+      "priority": 1,
+      "duration": 3600,
+      "minimalDuration": 900,
+      "currentPower": 2000,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-2/loads/heatpump-2"
+    },
+    {
+      "id": "dryer-2",
+      "friendlyName": "Dryer",
+      "loadType": "DRYER",
+      "priority": 3,
+      "duration": 2400,
+      "minimalDuration": 0,
+      "currentPower": 1000,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-2/loads/dryer-2"
+    },
+    {
+      "id": "wallbox-2",
+      "friendlyName": "EV Charger",
+      "loadType": "WALLBOX",
+      "priority": 2,
+      "currentPower": 6000,
+      "duration": 7200000,
+      "minimalDuration": 1800000,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-2/loads/wallbox-2"
+    }
+  ]
+}

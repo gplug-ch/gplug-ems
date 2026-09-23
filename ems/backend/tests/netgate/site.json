@@ -1,0 +1,10 @@
+{
+  "id": "s", "name": "net-gate fixture",
+  "loads": [
+    {"id": "load-a", "name": "boiler", "power": 3000, "priority": 1,
+     "integration": "simulator", "url": "http://10.0.0.11/", "url_on": "", "url_off": ""}
+  ],
+  "productions": [
+    {"id": "pv-1", "name": "pv", "integration": "simulator", "url": "http://10.0.0.12/"}
+  ]
+}

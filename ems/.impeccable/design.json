@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-29T00:00:00Z",
+  "title": "Design System: vZEV Energy Management UI",
+  "extensions": {
+    "colorMeta": {
+      "cream-bg":    { "role": "neutral", "displayName": "Cream BG",     "canonical": "#F3EFE2", "tonalRamp": ["#26241C", "#3C392B", "#57533F", "#756F55", "#9A9276", "#C0B99C", "#DED8C1", "#F3EFE2"] },
+      "surface":     { "role": "neutral", "displayName": "Surface",      "canonical": "#FFFFFF", "tonalRamp": ["#2A2A2A", "#454545", "#636363", "#858585", "#ACACAC", "#D2D2D2", "#EDEDED", "#FFFFFF"] },
+      "navy":        { "role": "neutral", "displayName": "Navy",         "canonical": "#1A1A38", "tonalRamp": ["#0C0C1B", "#1A1A38", "#26264F", "#35355A", "#4A4A79", "#6B6B99", "#9C9CBE", "#D2D2E2"] },
+      "navy-2":      { "role": "neutral", "displayName": "Navy-2",       "canonical": "#35355A", "tonalRamp": ["#161627", "#22223D", "#2C2C4C", "#35355A", "#4A4A78", "#66669A", "#9494BD", "#CFCFE1"] },
+      "text-mut":    { "role": "neutral", "displayName": "Text Muted",   "canonical": "#6B6B77", "tonalRamp": ["#2B2B31", "#3E3E45", "#54545C", "#6B6B77", "#8B8B95", "#ACACB4", "#CECED3", "#EEEEF0"] },
+      "amber":       { "role": "primary", "displayName": "Amber",        "canonical": "#F3B738", "tonalRamp": ["#4A3606", "#6E500A", "#946B0E", "#BC8813", "#E0A626", "#F3B738", "#F8CE72", "#FCE7B4"] },
+      "line":        { "role": "neutral", "displayName": "Line",         "canonical": "#E3DED0", "tonalRamp": ["#4B4739", "#67624F", "#847E67", "#A49E84", "#C2BCA4", "#E3DED0", "#EFEBDE", "#F7F4EC"] },
+      "production":  { "role": "tertiary","displayName": "Production (Gelb)",   "canonical": "#D99A06", "tonalRamp": ["#442F02", "#654703", "#875F05", "#A97706", "#CB8F08", "#D99A06", "#F0BB3E", "#F8D888"] },
+      "consumption": { "role": "secondary","displayName": "Consumption (Blau)", "canonical": "#2D9CDB", "tonalRamp": ["#0A2C3E", "#0F4460", "#155E83", "#1B79A8", "#2394CE", "#2D9CDB", "#68BAE6", "#A6D7F1"] },
+      "vzev":        { "role": "tertiary","displayName": "vZEV (Grün)",         "canonical": "#3E7C28", "tonalRamp": ["#12240B", "#1D3A15", "#29521E", "#356A27", "#3E7C28", "#4E9A33", "#77BC5D", "#A9D89A"] },
+      "import":      { "role": "tertiary","displayName": "Import (Rot)",        "canonical": "#C62D20", "tonalRamp": ["#3E0E09", "#5C140D", "#7C1B12", "#9C2217", "#BC291D", "#C62D20", "#E0665C", "#EFA6A0"] },
+      "battery":     { "role": "tertiary","displayName": "Battery (Türkis)",    "canonical": "#0F766E", "tonalRamp": ["#04241F", "#063A32", "#095147", "#0C685C", "#0F766E", "#149286", "#3FBDAF", "#8AD8CF"] },
+      "import-fill": { "role": "tertiary","displayName": "Import Fill",         "canonical": "#F5C1BC", "tonalRamp": ["#5C2721", "#7E362E", "#A0463B", "#C15D51", "#DA8479", "#EBA9A0", "#F5C1BC", "#FBE0DD"] },
+      "vzev-fill":   { "role": "tertiary","displayName": "vZEV Fill",           "canonical": "#C4E3C9", "tonalRamp": ["#28402B", "#39583D", "#4E7152", "#688B6C", "#89A88C", "#A9C4AC", "#C4E3C9", "#E3F2E5"] },
+      "active":      { "role": "tertiary","displayName": "Active",             "canonical": "#2FA452", "tonalRamp": ["#0C2E17", "#124623", "#185E30", "#1F763D", "#268E4A", "#2FA452", "#5FC17D", "#9BDBAF"] },
+      "inactive":    { "role": "neutral", "displayName": "Inactive",           "canonical": "#6B6B77", "tonalRamp": ["#2B2B31", "#3E3E45", "#54545C", "#6B6B77", "#8B8B95", "#ACACB4", "#CECED3", "#EEEEF0"] }
+    },
+    "typographyMeta": {
+      "display":  { "displayName": "Display",  "purpose": "The single hero number — signed live meter total on «Zähler». One per view at most." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles (28px; 24px mobile)." },
+      "title":    { "displayName": "Title",    "purpose": "Card titles (20/700). KPI figures run heavier (800/26px) as a sibling." },
+      "body":     { "displayName": "Body",     "purpose": "Running text and table cells; the base document size." },
+      "label":    { "displayName": "Label",    "purpose": "Field labels, captions, ticks, and — in the micro/uppercase variant — provenance tags and eyebrows." }
+    },
+    "shadows": [
+      { "name": "soft-lift", "value": "0 1px 3px rgba(26,26,56,0.07), 0 4px 14px rgba(26,26,56,0.05)", "purpose": "The single elevation token — a gentle navy-tinted lift for cards, floating chrome, and nodes. There is no second tier." }
+    ],
+    "motion": [
+      { "name": "state-fast", "value": "0.15s ease", "purpose": "Hover / active / focus state transitions on buttons, nav, pills, fields." },
+      { "name": "press", "value": "transform 0.05s", "purpose": "Button press (translateY 1px)." },
+      { "name": "flow-dash", "value": "0.9s linear infinite", "purpose": "Energy-flow edge dash drift in the flow direction; collapses to static under prefers-reduced-motion." },
+      { "name": "node-move", "value": "transform 0.5s ease", "purpose": "Battery node sliding between its source/sink slot in the flow diagram." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single high-emphasis action per view — amber fill, navy text.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Speichern</button>",
+      "css": ".ds-btn { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 10px 22px; min-height: 40px; cursor: pointer; transition: filter 0.15s, transform 0.05s; } .ds-btn:active { transform: translateY(1px); } .ds-btn-primary { background: #F3B738; color: #1A1A38; } .ds-btn-primary:hover { filter: brightness(0.95); } .ds-btn-primary:focus-visible { outline: 2px solid #F3B738; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral workhorse action — navy fill, cream text.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Abbrechen</button>",
+      "css": ".ds-btn-secondary { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 10px 22px; min-height: 40px; cursor: pointer; background: #1A1A38; color: #F7F3E5; transition: filter 0.15s, transform 0.05s; } .ds-btn-secondary:hover { filter: brightness(0.95); } .ds-btn-secondary:active { transform: translateY(1px); } .ds-btn-secondary:focus-visible { outline: 2px solid #F3B738; outline-offset: 2px; }"
+    },
+    {
+      "name": "Load-State Badge",
+      "kind": "chip",
+      "refersTo": "badge-active",
+      "description": "Pill badge for a load state; colour is always paired with the German state word.",
+      "html": "<span class=\"ds-badge ds-badge-active\">Aktiv</span>",
+      "css": ".ds-badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; } .ds-badge-active { background: #2FA452; } .ds-badge-waiting { background: #F3B738; color: #1A1A38; } .ds-badge-inactive { background: #6B6B77; }"
+    },
+    {
+      "name": "Domain Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White surface on the cream page with a 4px colour-coded left edge keyed to domain (here: Erzeuger gold).",
+      "html": "<div class=\"ds-card ds-card-production\"><div class=\"ds-card-head\"><h3 class=\"ds-card-title\">Erzeuger</h3><span class=\"ds-card-value\">4.2 kW</span></div><p class=\"ds-card-sub\">PV-Produktion · aktualisiert vor 2 s</p></div>",
+      "css": ".ds-card { background: #fff; border: 1px solid #E3DED0; border-left: 4px solid #E3DED0; border-radius: 12px; box-shadow: 0 1px 3px rgba(26,26,56,0.07), 0 4px 14px rgba(26,26,56,0.05); padding: 18px 20px; } .ds-card-production { border-left-color: #D99A06; } .ds-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; } .ds-card-title { margin: 0; font-size: 20px; font-weight: 700; color: #1A1A38; } .ds-card-value { font-size: 18px; font-weight: 700; color: #1A1A38; } .ds-card-sub { margin: 4px 0 0; color: #6B6B77; font-size: 12px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "textfield",
+      "description": "Labelled field; border shifts to amber on focus, keyboard focus keeps the amber ring.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Nennleistung (W)</span><input class=\"ds-textfield\" type=\"text\" value=\"2000\" /></label>",
+      "css": ".ds-field { display: inline-flex; flex-direction: column; gap: 5px; } .ds-field-label { font-size: 12px; color: #6B6B77; } .ds-textfield { font: inherit; font-size: 14px; color: #1A1A38; background: #fff; border: 1px solid #E3DED0; border-radius: 10px; padding: 10px 14px; min-height: 40px; } .ds-textfield:focus { border-color: #F3B738; outline: none; } .ds-textfield:focus-visible { outline: 2px solid #F3B738; outline-offset: 2px; }"
+    },
+    {
+      "name": "Pill Tab",
+      "kind": "nav",
+      "refersTo": "pill-tab",
+      "description": "Section/view switcher; active state is amber fill with navy text.",
+      "html": "<div style=\"display:flex;gap:8px\"><button class=\"ds-pill ds-pill-active\">Site</button><button class=\"ds-pill\">Lasten</button><button class=\"ds-pill\">Tarife</button></div>",
+      "css": ".ds-pill { font: inherit; font-weight: 600; border: 1px solid #E3DED0; background: #fff; color: #1A1A38; border-radius: 999px; padding: 8px 18px; min-height: 36px; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; } .ds-pill:hover { background: #FBF9F2; } .ds-pill-active, .ds-pill-active:hover { background: #F3B738; border-color: #F3B738; color: #1A1A38; }"
+    },
+    {
+      "name": "Provenance Tags",
+      "kind": "custom",
+      "refersTo": "meter-tag",
+      "description": "Signature trust component — every number is tagged Register (authoritative meter reading) or berechnet (browser-derived); derived values get a dashed underline + help tooltip.",
+      "html": "<div style=\"display:flex;gap:16px;align-items:center\"><span style=\"display:inline-flex;gap:6px;align-items:center\"><strong style=\"color:#1A1A38\">230.4 V</strong><span class=\"ds-tag ds-tag-register\">Register</span></span><span style=\"display:inline-flex;gap:4px;align-items:center\"><span class=\"ds-derived\">0.98</span><span class=\"ds-tag ds-tag-derived\">berechnet</span></span></div>",
+      "css": ".ds-tag { display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; padding: 1px 6px; border-radius: 6px; white-space: nowrap; } .ds-tag-register { background: #E7EEF6; color: #2b527d; } .ds-tag-derived { background: #F1ECDD; color: #7a6a3a; } .ds-derived { border-bottom: 1px dashed #6B6B77; cursor: help; color: #1A1A38; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Swiss Energy Ledger",
+    "overview": "This is the account book of a household's energy and money — kept on warm paper, in a steady hand, by an instrument that never overstates what it knows. The interface reads like a trustworthy statement: a cream-paper ground, deep-navy structure, a single gold accent used with discipline, and — its defining habit — every number carries its provenance. A value is either a Register reading (authoritative, from the meter) or berechnet (derived in the browser), and it is always labelled as such. That honesty is the product; the visual system exists to make an invisible optimisation believable to a non-expert who may be looking at their own bill.\n\nThe system is precise and trustworthy before it is anything else. Density is calm, not crowded: white surfaces sit softly lifted above the warm paper, separated by warm hairlines and one gentle shadow, and each card announces which part of the energy world it belongs to through a 4px colour-coded left edge. Colour is never decoration — it is domain meaning, following the Swiss/DACH convention (Produktion gelb, Verbrauch blau, Einspeisung grün, Bezug rot, Batterie türkis), and it is never the only signal, because state and direction must survive colour-blindness and a monochrome print of a quarterly statement.\n\nThe world is deliberately not a dark energy-app dashboard, not neon gradients on black, not a gamified consumption tracker. It is closer to a well-set financial document that happens to update live. Restraint is the register; the live flow diagram and the KPI gauges are allowed a little animation, but they collapse to legible static forms under prefers-reduced-motion.",
+    "keyCharacteristics": [
+      "Warm cream paper ground; white is reserved for surfaces that hold data.",
+      "Deep navy for structure and type; a single gold accent, used sparingly.",
+      "Every number is provenance-tagged (Register vs. berechnet).",
+      "Colour = domain meaning (Swiss energy convention), never colour-alone.",
+      "Softly lifted surfaces: hairline borders + one gentle shadow + a colour-coded left edge.",
+      "Calm density; instrument-grade honesty about stale, provisional, and missing data."
+    ],
+    "rules": [
+      { "name": "The Warm-Paper Rule", "body": "The page ground is Cream BG (#F3EFE2); pure white is reserved for data-bearing surfaces. Never invert this — a white page body reads as a generic web app, not the ledger.", "section": "colors" },
+      { "name": "The One-Accent Rule", "body": "Amber is the only brand accent and appears on a small fraction of any screen (logo, one primary action, focus, active nav, warnings). If two things are amber for attention on the same view, one of them is wrong.", "section": "colors" },
+      { "name": "The Never-Colour-Alone Rule", "body": "State and direction are never encoded by colour alone. A flow has position + arrow + label; a load state has a text badge; a table sign has a glyph. This is load-bearing for WCAG AA, deuteranopia, and monochrome print of statements.", "section": "colors" },
+      { "name": "The Tabular-Numbers Rule", "body": "Any value that stacks in a column or updates in place uses tabular figures, so digits don't jitter as data refreshes. Money, power, and register readings always.", "section": "typography" },
+      { "name": "The One-Hero-Number Rule", "body": "Display size (40px) is spent on at most one number per view. If a second value competes at that size, demote it to KPI (26px) or Title.", "section": "typography" },
+      { "name": "The Fixed-Rail Rule", "body": "Navigation is a persistent navy rail on desktop and a navy drawer on mobile — never a light-on-light nav. The rail is the one large field of navy; content is paper.", "section": "layout" },
+      { "name": "The Single-Shadow Rule", "body": "The system has exactly one shadow token. Don't introduce a second elevation tier; hierarchy comes from the colour-coded left edge, hairlines, and paper contrast.", "section": "elevation" },
+      { "name": "The Colour-Edge Rule", "body": "A card's identity is its 4px left border: Netz = Navy, Erzeuger = Production gold, Lasten = Consumption blue, vZEV = vZEV green. Warning/hint surfaces use an amber left edge on a pale-amber (#FCF3DC) wash.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the page ground Cream BG (#F3EFE2) and reserve white for data-bearing surfaces.",
+      "Do give every card its domain identity via the 4px colour-coded left edge.",
+      "Do tag every number's provenance (Register vs. berechnet); dash-underline derived values.",
+      "Do encode state/direction redundantly — colour plus label/arrow/position/glyph.",
+      "Do use tabular figures for any value that aligns in a column or updates live.",
+      "Do honour the Swiss energy colour convention exactly (gelb/blau/grün/rot/türkis).",
+      "Do collapse all motion to a legible static form under prefers-reduced-motion."
+    ],
+    "donts": [
+      "Don't use Amber as a data-series colour, or place two attention-amber elements on one view.",
+      "Don't introduce a second shadow tier or heavier elevation — hierarchy comes from the colour edge, hairlines, and paper contrast.",
+      "Don't add a downloaded/web font or any third-party asset — one system font stack, ≤150 KB, no external requests.",
+      "Don't repurpose an energy-palette colour for decoration, or invert a Verbrauch/Produktion mapping.",
+      "Don't render a value as final when its data is provisional (provisorisch) or stale — surface the caveat.",
+      "Don't let tables or the flow diagram scroll the page body horizontally; scroll inside the component instead."
+    ]
+  }
+}

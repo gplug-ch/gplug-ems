@@ -1,0 +1,11 @@
+.vscode/
+.idea/
+
+# app
+*.tapp
+.env
+build
+ZZ_Playground/__pycache__/
+
+### MacOS ###
+.DS_Store

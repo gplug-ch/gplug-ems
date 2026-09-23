@@ -1,0 +1,52 @@
+{
+  "id": "site-3",
+  "name": "Site 3",
+  "location": "Bahnhofstrasse 80, Bern",
+  "description": "Demo Site",
+  "grid": [
+    {
+      "id": "from",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-3/grid/input"
+    },
+    {
+      "id": "to",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-3/grid/output"
+    }
+  ],
+  "loads": [
+    {
+      "id": "boiler-3",
+      "friendlyName": "Boiler",
+      "loadType": "BOILER",
+      "priority": 1,
+      "duration": 1800,
+      "minimalDuration": 600,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-3/loads/boiler-3"
+    },
+    {
+      "id": "heatpump-3",
+      "friendlyName": "Heat Pump",
+      "loadType": "HEATPUMP",
+      "priority": 1,
+      "duration": 3600,
+      "minimalDuration": 900,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-3/loads/heatpump-3"
+    },
+    {
+      "id": "dryer-3",
+      "friendlyName": "Dryer",
+      "loadType": "DRYER",
+      "priority": 3,
+      "duration": 2400,
+      "minimalDuration": 0,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-3/loads/dryer-3"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "id": "site-1",
+  "name": "Site 1",
+  "location": "Bahnhofstrasse 77, Bern",
+  "description": "Demo Site",
+  "productions": [
+    {
+      "id": "pv-solaredge",
+      "friendlyName": "PV SolarEdge",
+      "productionType": "PHOTOVOLTAIC",
+      "integration": "modbustcp",
+      "url": "192.168.0.150:502",
+      "unit": 1,
+      "function": 3,
+      "register": 40100,
+      "dtype": "int16"
+    },
+    {
+      "id": "battery-sunwoda",
+      "friendlyName": "Batterie Sunwoda",
+      "productionType": "BATTERY",
+      "integration": "modbustcp",
+      "url": "192.168.0.151:502",
+      "unit": 1,
+      "function": 4,
+      "register": 330,
+      "dtype": "int16",
+      "capacity": 10000,
+      "maxChargePower": 5000,
+      "maxDischargePower": 5000
+    }
+  ],
+  "modbusRegisters": [
+    {
+      "id": "wug-ug01-kw",
+      "friendlyName": "Kaltwasser UG01",
+      "integration": "modbustcp",
+      "url": "192.168.0.102:502",
+      "unit": 1,
+      "function": 3,
+      "register": 194,
+      "dtype": "float32",
+      "unitLabel": "m³"
+    },
+    {
+      "id": "wug-ug01-ww",
+      "friendlyName": "Warmwasser UG01",
+      "integration": "modbustcp",
+      "url": "192.168.0.102:502",
+      "unit": 1,
+      "function": 3,
+      "register": 2834,
+      "dtype": "float32",
+      "unitLabel": "m³"
+    },
+    {
+      "id": "wug-ug01-h",
+      "friendlyName": "Wärmemenge UG01",
+      "integration": "modbustcp",
+      "url": "192.168.0.102:502",
+      "unit": 1,
+      "function": 3,
+      "register": 894,
+      "dtype": "float32",
+      "unitLabel": "kWh"
+    }
+  ],
+  "grid": [
+    {
+      "id": "from",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.193:9090/simulator/sites/site-1/grid/input"
+    },
+    {
+      "id": "to",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.193:9090/simulator/sites/site-1/grid/output"
+    }
+  ],
+  "loads": [
+    {
+      "id": "boiler-1",
+      "friendlyName": "Boiler",
+      "loadType": "ELECTRICITY",
+      "priority": 2,
+      "currentPower": 500,
+      "integration": "simulator",
+      "url": "http://192.168.0.193:9090/simulator/sites/site-1/loads/boiler-1"
+    }
+  ]
+}

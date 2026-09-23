@@ -1,0 +1,94 @@
+{
+  "id": "site-1",
+  "name": "Site 1",
+  "location": "Riedstrasse 12, Emmen",
+  "description": "Demo Site — UDP integration: productions received via UDP multicast",
+  "messaging": {
+    "udp": {
+      "multicast_ip": "239.3.0.1",
+      "port": 5007
+    }
+  },
+  "productions": [
+    {
+      "id": "pv-1",
+      "friendlyName": "PV",
+      "productionType": "PHOTOVOLTAIC",
+      "dimension": "kW",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/productions/pv-1"
+    }
+  ],
+  "grid": [
+    {
+      "id": "from",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/grid/input"
+    },
+    {
+      "id": "to",
+      "dimension": "W",
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/grid/output"
+    }
+  ],
+  "loads": [
+    {
+      "id": "boiler-1",
+      "friendlyName": "Boiler",
+      "loadType": "ELECTRICITY",
+      "currentPower": 500,
+      "priority": 2,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/loads/boiler-1"
+    },
+    {
+      "id": "heatpump-1",
+      "friendlyName": "Heat Pump",
+      "loadType": "HEATPUMP",
+      "priority": 1,
+      "duration": 3600,
+      "minimalDuration": 900,
+      "currentPower": 2000,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/loads/heatpump-1"
+    },
+    {
+      "id": "dryer-1",
+      "friendlyName": "Dryer",
+      "loadType": "DRYER",
+      "priority": 3,
+      "duration": 2400,
+      "currentPower": 1000,
+      "minimalDuration": 0,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/loads/dryer-1"
+    },
+    {
+      "id": "wallbox-1",
+      "friendlyName": "EV Charger",
+      "loadType": "WALLBOX",
+      "priority": 2,
+      "duration": 7200000,
+      "minimalDuration": 1800000,
+      "currentPower": 6000,
+      "integration": "simulator",
+      "url": "http://192.168.0.194:9090/simulator/sites/site-1/loads/wallbox-1"
+    },
+    {
+      "id": "site-2",
+      "friendlyName": "Site 2 Load",
+      "loadType": "SITE",
+      "priority": 3,
+      "integration": "udp"
+    },
+    {
+      "id": "site-3",
+      "friendlyName": "Site 3 Load",
+      "loadType": "SITE",
+      "priority": 3,
+      "integration": "udp"
+    }
+  ]
+}

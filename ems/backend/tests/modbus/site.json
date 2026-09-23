@@ -1,0 +1,13 @@
+{
+  "id": "s", "name": "modbus fixture",
+  "loads": [],
+  "productions": [],
+  "modbusRegisters": [
+    {"id": "heat-ug01", "friendlyName": "Waermemessung UG01",
+     "integration": "modbustcp", "url": "10.0.0.9:502",
+     "unit": 1, "function": 3, "register": 194, "dtype": "float32"},
+    {"id": "batt-power", "friendlyName": "Batterieleistung",
+     "integration": "modbustcp", "url": "10.0.0.9:502",
+     "unit": 1, "function": 4, "register": 330, "dtype": "int16"}
+  ]
+}
