@@ -8,7 +8,7 @@ published to the CDN before a device runs it** — see
 [The web UI is served from a CDN](../README.md#the-web-ui-is-served-from-a-cdn-gplug-cdn).
 
 The two halves have a clear split (see the
-[root README](../README.md#where-computation-happens)): the device runs the
+[architecture doc](../docs/architecture.md#where-computation-happens)): the device runs the
 allocation loop, samples power and stores raw 15-min records; **everything
 derived — roll-ups, CHF costs, config validation — happens in the browser.** So most feature work is frontend work,
 and the frontend can be developed on your laptop against a real device.

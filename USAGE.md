@@ -1,6 +1,6 @@
 # gPlug EMS Usage Guide
 
-This guide covers how to set up, configure, and run the gPlug Energy Management System (EMS) — both the simulator (for testing and demonstration) and the production EMS on physical gPlug devices.
+Reference for configuring the gPlug EMS (`site.json`) and for running the simulator. Installation and everyday use of the EMS are in the [README](README.md).
 
 ## Prerequisites
 
@@ -86,7 +86,7 @@ docker compose up --build
 
 ## EMS on gPlug
 
-### 1. Configure the site
+### Configure the site
 
 Create a `site.json` for your gPlug device. Start from one of the examples in `ems/backend/examples/`:
 
@@ -146,41 +146,8 @@ Key fields:
 
 **Production types:** `PHOTOVOLTAIC`, `BATTERY`
 
-### 2. Get the `.tapp`
-
-Download it from the [latest GitHub Release](https://github.com/jluthiger/gplug-ems/releases/latest).
-Pick one: `ems-v<VERSION>.tapp` (German UI) or `ems-v<VERSION>-en.tapp`
-(English UI). Either way the device loads the UI assets from the
-[CDN](README.md#the-web-ui-is-served-from-a-cdn-gplug-cdn), so the browser needs internet access.
-
-Or build it yourself (repo root): `make` → `build/ems-v<VERSION>.tapp`
-(`make LANG=en` for English).
-
-### 3. Deploy to the gPlug device
-
-```sh
-make flash DEVICE=<gplug-ip>   # removes stale .tapp files, then uploads the new one (DRYRUN=1 to preview)
-```
-
-Or manually:
-
-1. Open the Tasmota web UI at `http://<gplug-ip>/`
-2. Go to **Tools → Manage File system**, delete any older `ems-v*.tapp` (Tasmota boots every `.tapp` in the root) and upload the new `.tapp`
-3. Upload your `site.json` via the same filesystem manager (it can later be edited in the EMS UI under **Einstellungen**)
-4. Restart the device
-
-For a downloaded release, `ems/backend/deploy.sh <gplug-ip> <file.tapp>` (from a
-checkout) does the same as `make flash`.
-
-### 4. Access the EMS frontend
-
-Once the device is running, the Preact UI is available at:
-
-```
-http://<gplug-ip>/app
-```
-
-Pages: **Übersicht** (live grid, productions and loads; manual state transitions), **Verlauf** (energy and cost history), **Zähler** (smart-meter values, shown when the device has meter data), **Modbus** (standalone Modbus registers, shown when configured) and **Einstellungen** (site, loads, productions, grid, Modbus, tariffs, data, gPlug and pro settings).
+Installation (getting the `.tapp`, uploading it, first boot) and the
+UI pages are described in the [README](README.md#installation).
 
 ---
 
