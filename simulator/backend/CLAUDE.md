@@ -20,8 +20,9 @@ Run a single test class:
 ./gradlew test --tests "ch.gplug.simulator.production.ProductionServiceTest"
 ```
 
-Tests: `SimulatorApplicationTests` (context), `ModularityTests` (Spring Modulith boundaries),
-`production/ProductionServiceTest` (battery SoC model).
+Tests: `SimulatorApplicationTests` (context, Modbus on port 0), `ModularityTests` (Spring Modulith boundaries),
+`production/ProductionServiceTest` (battery SoC model), `modbus/*Test` (codec, FC 3/4/6/16 +
+exceptions, bindings, MBAP over a real socket).
 
 ## Architecture
 
@@ -44,6 +45,31 @@ package root, controllers/wiring in `*/internal`; boundaries verified by `Modula
   live grid state for the EMS «Zähler» page (spec 007). Returns the raw `z`-shaped object;
   energy registers are integrated on read. `full` (default) = extended CIP list,
   `basis` = 15-element Basisliste (no per-phase power), `minimal` = Pi/Po only.
+- **modbus** — Modbus TCP slave (issue #16) for the EMS `modbustcp` integration, see below.
+
+**Modbus TCP server** (`modbus/`, hand-rolled MBAP/PDU on a plain `ServerSocket`, one virtual
+thread per connection, started as a `SmartLifecycle`). Config under `simulator.modbus` in
+`application.yaml`: `enabled`, `port` (default 5020 — 502 needs root), `slaves[]` of
+`{unit, registers[]}`. Each register:
+
+| Key | Meaning |
+|-----|---------|
+| `address` | Wire address, no 40001 offset; 32-bit types occupy `address` and `address+1` |
+| `table` | `holding` (FC 3, writable via FC 6/16) or `input` (FC 4, read-only over Modbus) |
+| `dtype` | `int16`, `uint16`, `int32`, `uint32`, `float32` (big-endian ABCD) |
+| `swapWords` | CDAB word order for 32-bit types |
+| `scale` | Raw register = value / scale (the EMS decodes raw × `scale`); ints rounded + clamped |
+| `source` | Live value `<siteId>/<itemId>/<field>`: production `currentPower`\|`soc`, grid `input`\|`output` (or meter id) `currentPower`, load `state` (0 INACTIVE, 1 WAITING, 2 ACTIVE). Without it the register is static |
+| `value` | Static initial value |
+| `action` | Simulator action run on write: production/grid `currentPower`, load `state` |
+| `name` | Label for the UI |
+
+Bound registers without `action` are read-only. Exceptions: 01 unsupported function, 02
+unmapped address or write to a read-only register (the whole write is rejected), 03 bad
+quantity/length or a value the action rejects, 0B unknown unit id. Try it:
+`mbpoll -m tcp -p 5020 -a 1 -0 -1 -t 3:float -B -r 106 localhost` (`-t 3` = input, `-t 4` =
+holding, `-0` = wire addresses; append a value to write). EMS example:
+`ems/backend/examples/site-sim-modbus.json`.
 
 **REST endpoints** (context-path `/simulator`, port 9090 — see `application.yaml`):
 
@@ -57,6 +83,8 @@ package root, controllers/wiring in `*/internal`; boundaries verified by `Modula
 | GET | `/sites/{siteId}/grid[/input\|/output]` | Grid meters |
 | PUT | `/sites/{siteId}/grid/{meterId}/power` | Body `{"power":<W>}` (≥ 0) |
 | GET | `/sites/{siteId}/meter[?variant=full\|basis\|minimal]` | Synthetic smart-meter descriptor |
+| GET | `/modbus` | Modbus server status + registers (config, raw `words`, decoded `value`, `settable`, `writable`) |
+| PUT | `/modbus/{unit}/{holding\|input}/{address}` | Body `{"value":<n>}` — set a static register or run its `action` (400 if bound read-only) |
 
 OpenAPI UI: `http://localhost:9090/simulator/swagger-ui.html` (springdoc).
 

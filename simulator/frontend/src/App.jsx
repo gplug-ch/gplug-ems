@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import './App.css'
-import { fetchSites, activateLoad, setProductionPower, fetchGrid, setGridPower } from './api.js'
+import {
+  fetchSites, activateLoad, setProductionPower, fetchGrid, setGridPower, fetchModbus, setModbusValue,
+} from './api.js'
 
 const LOAD_TYPE_INFO = {
   DRYER:    { label: 'Dryer',      symbol: '⟳' },
@@ -196,6 +198,92 @@ function GridControl({ grid, siteId, onSetPower }) {
   )
 }
 
+const hexWord = w => w.toString(16).toUpperCase().padStart(4, '0')
+// float32 carries ~7 significant digits; hide the rest of the double noise
+const fmtValue = v => Number(v.toPrecision(7))
+
+function ModbusValueCell({ register, onSetValue }) {
+  const shown = fmtValue(register.value)
+  const [value, setValue] = useState(String(shown))
+  const [pending, setPending] = useState(false)
+
+  useEffect(() => { setValue(String(shown)) }, [shown])
+
+  if (!register.settable) {
+    return <span className="modbus-table__value">{shown}</span>
+  }
+
+  const parsed = Number(value)
+  const handleSet = async () => {
+    setPending(true)
+    try {
+      await onSetValue(register, parsed)
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <span className="modbus-table__edit">
+      <input
+        className="modbus-table__input"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleSet() }}
+      />
+      <button
+        className="pv-control__set"
+        onClick={handleSet}
+        disabled={pending || value.trim() === '' || !Number.isFinite(parsed) || parsed === shown}
+      >
+        {pending ? '…' : 'SET'}
+      </button>
+    </span>
+  )
+}
+
+function ModbusPanel({ modbus, onSetValue }) {
+  if (!modbus) return <div className="modbus-panel__empty">Modbus server unavailable</div>
+
+  return (
+    <div className="modbus-panel">
+      <div className="modbus-panel__status">
+        {modbus.running ? `listening on port ${modbus.port}` : `stopped (port ${modbus.port})`}
+        {' · '}{modbus.registers.length} registers
+      </div>
+      <div className="modbus-table__scroll">
+        <table className="modbus-table">
+          <thead>
+            <tr>
+              <th>Unit</th><th>Table</th><th>Addr</th><th>Type</th><th>Scale</th>
+              <th>Name</th><th>Binding</th><th>Raw</th><th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {modbus.registers.map(r => (
+              <tr key={`${r.unit}/${r.table}/${r.address}`}>
+                <td>{r.unit}</td>
+                <td>{r.table === 'holding' ? 'HR (3)' : 'IR (4)'}</td>
+                <td>{r.address}</td>
+                <td>{r.dtype}{r.swapWords ? ' CDAB' : ''}</td>
+                <td>{r.scale}</td>
+                <td>{r.name}</td>
+                <td className="modbus-table__binding">
+                  {r.source ?? 'static'}
+                  {r.action && <div>→ {r.action}</div>}
+                  {r.writable && <div className="modbus-table__rw">writable</div>}
+                </td>
+                <td>{r.words.map(hexWord).join(' ')}</td>
+                <td><ModbusValueCell register={r} onSetValue={onSetValue} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function SitePanel({ site, grid, onActivate, onSetPower, onSetGridPower }) {
   const [pendingAll, setPendingAll] = useState(false)
   const inactiveLoads = site.loads.filter(l => l.state === 'INACTIVE')
@@ -318,6 +406,7 @@ function Overview({ sites }) {
 export default function App() {
   const [sites, setSites]         = useState([])
   const [grids, setGrids]         = useState({})
+  const [modbus, setModbus]       = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
   const [error, setError]         = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
@@ -346,6 +435,7 @@ export default function App() {
         })
       )
       setGrids(Object.fromEntries(gridEntries.filter(([, g]) => g !== null)))
+      setModbus(await fetchModbus().catch(() => null))
       setLastUpdate(new Date())
       setError(null)
     } catch (e) {
@@ -371,6 +461,11 @@ export default function App() {
 
   const handleSetGridPower = useCallback(async (siteId, gridId, power) => {
     await setGridPower(siteId, gridId, power)
+    await poll()
+  }, [poll])
+
+  const handleSetModbusValue = useCallback(async (register, value) => {
+    await setModbusValue(register.unit, register.table, register.address, value)
     await poll()
   }, [poll])
 
@@ -412,11 +507,19 @@ export default function App() {
             {site.name.toUpperCase()}
           </button>
         ))}
+        <button
+          className={`tab ${activeTab === 'modbus' ? 'tab--active' : ''}`}
+          onClick={() => setActiveTab('modbus')}
+        >
+          MODBUS
+        </button>
       </nav>
 
       <main className="app-main">
         {activeTab === 'overview' ? (
           <Overview sites={sites} />
+        ) : activeTab === 'modbus' ? (
+          <ModbusPanel modbus={modbus} onSetValue={handleSetModbusValue} />
         ) : activeSite ? (
           <SitePanel
             site={activeSite}

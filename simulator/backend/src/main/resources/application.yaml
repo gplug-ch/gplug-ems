@@ -122,3 +122,39 @@ simulator:
           priority: 3
           duration: 2400
           minimalDuration: 0
+  # Modbus TCP slave (issue #16) for the EMS `modbustcp` integration.
+  # `address` is the wire address (no 40001 offset); `table` holding (FC 3,
+  # writable via FC 6/16) or input (FC 4). `source` binds a live value
+  # `<siteId>/<itemId>/<field>` (production currentPower|soc, grid
+  # input|output currentPower, load state 0/1/2); without it the register is
+  # static (`value`, writable). `action` runs a simulator action on write.
+  # The raw register value is value / scale (the EMS decodes raw * scale).
+  modbus:
+    enabled: true
+    port: 5020
+    slaves:
+      - unit: 1
+        registers:
+          # pv-1 power in every dtype / word order (the EMS decodes all to W)
+          - { address: 100, table: input, dtype: int16, scale: 10, source: site-1/pv-1/currentPower, name: "PV int16 x10 W" }
+          - { address: 101, table: input, dtype: uint16, source: site-1/pv-1/currentPower, name: "PV uint16 W" }
+          - { address: 102, table: input, dtype: int32, source: site-1/pv-1/currentPower, name: "PV int32 W" }
+          - { address: 104, table: input, dtype: uint32, source: site-1/pv-1/currentPower, name: "PV uint32 W" }
+          - { address: 106, table: input, dtype: float32, source: site-1/pv-1/currentPower, name: "PV float32 W" }
+          - { address: 108, table: input, dtype: float32, swapWords: true, source: site-1/pv-1/currentPower, name: "PV float32 CDAB W" }
+          - { address: 110, table: input, dtype: int32, swapWords: true, source: site-1/pv-1/currentPower, name: "PV int32 CDAB W" }
+          - { address: 112, table: input, dtype: float32, scale: 1000, source: site-1/pv-1/currentPower, name: "PV float32 kW" }
+          # battery: signed power (+ discharge, - charge), SoC in 0.1 %
+          - { address: 200, table: input, dtype: int16, source: site-1/battery-1/currentPower, name: "Battery W" }
+          - { address: 201, table: input, dtype: uint16, scale: 0.1, source: site-1/battery-1/soc, name: "Battery SoC 0.1 %" }
+          # grid meters
+          - { address: 300, table: input, dtype: uint32, source: site-1/input/currentPower, name: "Grid import W" }
+          - { address: 302, table: input, dtype: uint32, source: site-1/output/currentPower, name: "Grid export W" }
+          # static, writable holding registers
+          - { address: 1000, table: holding, dtype: uint16, value: 0, name: "Static uint16" }
+          - { address: 1001, table: holding, dtype: float32, value: 1.5, name: "Static float32" }
+          # boiler state, writable: 0 = INACTIVE, 1 = WAITING, 2 = ACTIVE
+          - { address: 1100, table: holding, dtype: uint16, source: site-1/boiler-1/state, action: site-1/boiler-1/state, name: "Boiler state" }
+      - unit: 2
+        registers:
+          - { address: 0, table: holding, dtype: int32, source: site-2/input/currentPower, name: "Site 2 grid import W" }

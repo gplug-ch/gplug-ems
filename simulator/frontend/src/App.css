@@ -601,3 +601,83 @@
   color: var(--text);
   line-height: 1;
 }
+
+/* ── Modbus register table ───────────────────────────────────── */
+
+.modbus-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 20px 24px;
+}
+
+.modbus-panel__status,
+.modbus-panel__empty {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.modbus-table__scroll {
+  overflow-x: auto;
+}
+
+.modbus-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-data);
+  font-size: 12px;
+}
+
+.modbus-table th {
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.modbus-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-dim);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.modbus-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.modbus-table__binding {
+  color: var(--text-dim);
+}
+
+.modbus-table__rw {
+  color: var(--active-text);
+  font-size: 10px;
+}
+
+.modbus-table__value {
+  color: var(--text-bright);
+}
+
+.modbus-table__edit {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.modbus-table__input {
+  width: 90px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-bright);
+  font-family: var(--font-data);
+  font-size: 12px;
+  padding: 5px 8px;
+}
