@@ -22,12 +22,13 @@ const DEV_PORT = Number(process.env.DEV_SERVER_PORT || 5173);
  * Build modes (see README "Build & deploy"). The *asset base* is the single
  * knob that decides where the shipped index.html loads its JS/CSS from:
  *
- *   ASSET_BASE unset | "cdn"  -> https://<CDN_BASE_URL>/<version>/   (default)
- *   ASSET_BASE = "self"       -> /fs?name=...  (assets packed into the .tapp,
- *                                served on-device; restricted-network fallback)
+ *   ASSET_BASE unset | "cdn"  -> <CDN_BASE_URL>/<version>/   (default)
  *   ASSET_BASE = "dev"        -> <DEV_SERVER_URL>/src/entry.js  (loads from a
  *                                running `npm run dev` server, with HMR)
- *   ASSET_BASE = "<url>"      -> https://<url>/<version>/  (internal mirror)
+ *   ASSET_BASE = "<url>"      -> <url>/<version>/  (internal mirror)
+ *
+ * There is no self-host mode: the JS/CSS and lang.json are never packed into
+ * the .tapp, the device only ships the index.html shell.
  *
  * The version comes from the repo-root VERSION.txt (the Makefile passes it in as
  * APP_VERSION); a standalone `npm run build` reads the file directly. Output is
@@ -44,13 +45,10 @@ const assetBase = process.env.ASSET_BASE || 'cdn';
 const cdnBaseUrl = (process.env.CDN_BASE_URL || 'https://gplug-ch.github.io/gplug-cdn').replace(/\/+$/, '');
 const devServerUrl = (process.env.DEV_SERVER_URL || `http://${lanIPv4()}:${DEV_PORT}`).replace(/\/+$/, '');
 
-const isSelf = assetBase === 'self';
+if (assetBase === 'self') {
+  throw new Error('ASSET_BASE=self was removed: the UI is always served from the CDN');
+}
 const isDev = assetBase === 'dev';
-
-// Tasmota serves every static file through GET /fs?name=<file>. Vite collapses
-// a real query string in `base` during URL joining, so self-host builds use a
-// sentinel path base and rewrite it to /fs?name= in a post-HTML transform.
-const FS_SENTINEL = '/__fs__/';
 
 let base, outDir;
 if (isDev) {
@@ -58,10 +56,6 @@ if (isDev) {
   // The built JS/CSS is discarded; the post-HTML transform swaps in dev tags.
   base = '/';
   outDir = 'dist/dev';
-} else if (isSelf) {
-  // no directory support on-device -> flatten filenames (no assets/ prefix)
-  base = FS_SENTINEL;
-  outDir = 'dist/self';
 } else {
   const host = assetBase === 'cdn' ? cdnBaseUrl : assetBase.replace(/\/+$/, '');
   base = `${host}/${version}/`;
@@ -72,8 +66,8 @@ if (isDev) {
 // The device no longer serves lang.json (~21 KB) on every UI load — serving it
 // from the .tapp exhausted the ESP32-C3 heap (MEMORY ALLOCATION FAILED in
 // _serve_file/_open_bundled). Instead the build publishes it next to the JS/CSS
-// bundle, so the browser fetches it from the CDN (or, self-host/dev, on-device
-// via /fs?name=lang.json). See __LANG_URLS__ below.
+// bundle, so the browser fetches it from the CDN (dev: from the dev server).
+// See __LANG_URLS__ below.
 function buildLangDict() {
   const i18nDir = fileURLToPath(new URL('./i18n/', import.meta.url));
   const merged = JSON.parse(readFileSync(i18nDir + 'de.json', 'utf8'));
@@ -88,9 +82,8 @@ function buildLangDict() {
 // Dictionary file name. CDN/mirror builds of every language share one
 // dist/<version>/ directory (and one CDN version folder), so a non-German
 // dictionary gets its own name (lang-en.json) instead of overwriting the
-// German lang.json. Self-host and dev keep lang.json: there it is served
-// on-device or by the dev server, one language per build.
-const langFile = uilang === 'de' || isSelf || isDev ? 'lang.json' : `lang-${uilang}.json`;
+// German lang.json. Dev keeps lang.json: the dev server serves one language.
+const langFile = uilang === 'de' || isDev ? 'lang.json' : `lang-${uilang}.json`;
 
 // Device endpoints proxied in dev (see `server.proxy` below). `/api` covers
 // /api/power|energy|meta|meter|modbus|config; /cm is the Tasmota command
@@ -100,22 +93,16 @@ const DEVICE_PATHS = ['/api', '/loads', '/productions', '/site', '/fs', '/cm'];
 
 export default defineConfig(({ command }) => {
   // Production dictionary URL, baked into the app via __LANG_URLS__: the CDN
-  // bundle host for CDN/mirror builds, or /fs?name=lang.json for self-host.
-  // Dev does NOT use this — main.js derives the dev-server URL from
+  // (or mirror) bundle host. Dev does NOT use this — main.js derives the dev-server URL from
   // import.meta.url when import.meta.env.DEV, so the flashed ASSET_BASE=dev
   // shell always loads lang.json from `npm run dev`, never the device.
-  const langUrl = isSelf ? '/fs?name=lang.json' : `${base}${langFile}`;
-
-  // Ordered fetch list baked into main.js. Only self-host packs lang.json into
-  // the .tapp, so only self-host may fall back to the device: in CDN mode that
-  // file is absent and, more to the point, an unreachable CDN means the JS
-  // bundle never loaded either — there is no app left to translate.
-  const langUrls = isSelf
-    ? [langUrl, 'lang.json', 'i18n/de.json']
-    : [langUrl];
+  // No device fallback: lang.json is not packed into the .tapp and, more to
+  // the point, an unreachable CDN means the JS bundle never loaded either —
+  // there is no app left to translate.
+  const langUrls = [`${base}${langFile}`];
 
   return {
-  // The CDN/self base only applies to the built bundle; the dev server always
+  // The CDN base only applies to the built bundle; the dev server always
   // serves from root so http://<ip>:5173/ works and /i18n/de.json resolves.
   base: command === 'build' ? base : '/',
   define: {
@@ -152,16 +139,7 @@ export default defineConfig(({ command }) => {
     // KEEP_DIST=1 adds to dist/<version>/ instead of wiping it: `make release`
     // builds de then en into the same CDN version directory and deploys both.
     emptyOutDir: process.env.KEEP_DIST !== '1',
-    assetsDir: isSelf ? '.' : 'assets',
-    rollupOptions: isSelf
-      ? {
-          output: {
-            entryFileNames: '[name]-[hash].js',
-            chunkFileNames: '[name]-[hash].js',
-            assetFileNames: '[name]-[hash][extname]',
-          },
-        }
-      : {},
+    assetsDir: 'assets',
   },
   plugins: [
     {
@@ -169,8 +147,7 @@ export default defineConfig(({ command }) => {
       // browser fetches it from the CDN instead of the device. Cross-origin
       // fetch() needs CORS, so also drop a Cloudflare Pages `_headers` at the
       // deploy root (dist/) granting Access-Control-Allow-Origin. Both are
-      // emitted for every build mode — harmless where lang.json is served
-      // on-device (self/dev), and it keeps `npm run build && npm run deploy`
+      // emitted for every build mode — harmless in dev mode, and it keeps `npm run build && npm run deploy`
       // self-contained (no dependency on the Makefile's bundle.py step).
       name: 'gplug-lang',
       apply: 'build',
@@ -192,13 +169,12 @@ export default defineConfig(({ command }) => {
     {
       name: 'gplug-html',
       // Runs after Vite injects the hashed asset tags: set <html lang> to the
-      // build language (replaces the old Makefile sed) and, for self-host
-      // builds, rewrite the sentinel base to the on-device /fs?name= form.
+      // build language (replaces the old Makefile sed) and, for dev builds,
+      // swap the bundled asset tags for the dev server's.
       transformIndexHtml: {
         order: 'post',
         handler(html) {
           html = html.replace(/<html lang="[^"]*">/, `<html lang="${uilang}">`);
-          if (isSelf) html = html.split(FS_SENTINEL).join('/fs?name=');
           if (isDev) {
             // Drop the bundled asset tags and load from the dev server instead:
             // the Vite HMR client + the unbundled entry (CSS is injected by JS).

@@ -16,8 +16,8 @@ The gPlug EMS runs standalone on one gPlug device per site. It distributes the s
   - has a webservice endpoint to set the state of a load (consumer) of the site. Example `GET .../loads?id=dryer-1&action=transition&to=active`
   - supports the following states: `inactive, waiting, active` ; else respond with an error
   - has a webservice endpoint to read the power productions of the site. Example `GET .../productions`
-  - item-level reads (`?id=`), `action=read-state` and `action=set-power` were removed with spec 011 step 1 — no client ever called them
-  - serves raw data only: `GET /api/power` (10 s sample ring), `GET /api/energy?res=15m` (raw Wh records), `GET /api/meter` (the Tasmota SMI sensor object verbatim), `GET /api/meta`, `GET /site`
+  - item-level reads (`?id=`), `action=state` and `action=set-power` were removed with spec 011 step 1 — no client ever called them
+  - serves raw data only: `GET /api/power` (10 s sample ring, last 15 min), `GET /api/energy?res=15m` (raw Wh records), `GET /api/meter` (the Tasmota SMI sensor object verbatim), `GET /api/modbus` (standalone Modbus registers from `site.json` `modbusRegisters`), `GET /api/meta`, `GET /site`
   - the single exception to GET-only is `POST /api/config`, which writes `site.json` and reloads (spec 006)
 - has access to consumption (IN: power from the grid) and export (OUT: power to the grid) values over its smartmeter
 - is based on the configuration file 'site.json' (the former 'ems.json' is gone — one file per device)
@@ -42,7 +42,7 @@ curl 'http://192.168.0.97/productions' | jq
 
 - uses [preact](https://preactjs.com/) with [htm](https://github.com/developit/htm) as javascript single page application — tagged templates instead of JSX
 - built with [Vite](https://vite.dev/); no runtime CSS or charting framework: the styling is hand-written CSS and the graphs are hand-rolled SVG (`src/charts.js`)
-- the device ships only a small `index.html` shell in the `.tapp`; the hashed JS/CSS bundle and the `lang.json` dictionary are downloaded from a CDN (GitHub Pages, `gplug-ch/gplug-cdn`), versioned by `VERSION.txt`. `make build-self` packs them back into the `.tapp` for offline networks
+- the device ships only a small `index.html` shell in the `.tapp`; the hashed JS/CSS bundle and the `lang.json` dictionary are downloaded from a CDN (GitHub Pages, `gplug-ch/gplug-cdn`), versioned by `VERSION.txt`. There is no self-hosted variant: the browser needs internet access to load the UI
 - visualize one site, represented by its backend
 - shows the state of all loads: inactive, waiting, active
 - shows for each load its data as a 2d-graph
@@ -58,17 +58,18 @@ The backend controls the power distribution to the loads of its own site:
   ```text
   Prioritized threshold algorithm with sequence
 
-  Surplus = PV_Power − Household_Consumption
-  For each consumer in order of priority:
+  Surplus = sum of currentPower of all non-battery productions (PV);
+            a battery is only observed and never counts as surplus
+  For each consumer in state waiting or active, in order of priority (ascending):
 
-  If consumer is not active AND Surplus ≥ Consumer_Minimum_Power AND Consumer.State is not blocked, then:
-    – Switch consumer on
-    – Reduce “Surplus” by the target charging power
+  If consumer is waiting AND Surplus ≥ its rated power (currentPower), then:
+    – Switch consumer on (active)
+    – Reduce “Surplus” by its rated power
 
-  If consumer is running, but Surplus drops below a lower threshold (e.g. 200 W), then:
-    – Check whether the minimum runtime has been reached
-    – If yes → switch consumer off
-    – If no → keep the consumer running until the minimum runtime is reached
+  If consumer is active, but Surplus drops below its rated power minus a lower threshold (200 W), then:
+    – Check whether the minimum runtime (minimalDuration) has been reached
+    – If yes → switch consumer back to waiting
+    – If no → keep the consumer running until the minimum runtime is reached
   ```
 
 ## Simulator

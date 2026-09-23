@@ -9,14 +9,16 @@
 > pipeline evolved away from this draft's "no-build `bundle.py` concatenation +
 > committed `vendor.js`" plan (FR-201/FR-202/FR-215/FR-216). The shipped app is
 > built with **Vite** (ES modules under `src/`, `npm`-managed `preact` + `htm` —
-> not committed vendor files) and served in one of three modes selected by
-> `ASSET_BASE`: **`cdn`** (default — hashed JS/CSS on Cloudflare Pages, the
-> device ships only the `index.html` shell + `lang.json`), **`self`** (assets
-> packed into the `.tapp`, served via `/fs?name=…` for restricted networks), and
-> **`dev`** (HMR from a `npm run dev` server). `bundle.py --lang-only` survives
-> only to emit `lang.json` and run the i18n key-completeness check. The 150 KB
-> budget (C-3) applies to the **self-host** bundle (currently ≈ 121 KB + lang);
-> in CDN mode the on-device payload is far smaller. Everything else — shell,
+> not committed vendor files) and served in one of two modes selected by
+> `ASSET_BASE`: **`cdn`** (default — hashed JS/CSS and `lang.json` on GitHub
+> Pages, `gplug-ch/gplug-cdn`; the device ships only the `index.html` shell;
+> `ASSET_BASE=<url>` points at an internal mirror instead) and **`dev`** (HMR
+> from a `npm run dev` server). There is no self-hosted mode: the assets are
+> never packed into the `.tapp`, so the on-device asset serving of FR-202/FR-215, the size check of FR-216 and
+> the "ships fully inside the `.tapp`" goal below are superseded.
+> `bundle.py --lang-only` survives only to run the i18n key-completeness check.
+> The 150 KB budget (C-3) is met by construction — the device holds only the
+> ~0.5 KB shell. Everything else — shell,
 > hash router, design tokens, i18n, formatters, shared components, hand-rolled
 > SVG `LineChart`/`BarChart` with labeled axes — is as specified. The
 > per-language `make LANG=en` build (UC-203) still holds.

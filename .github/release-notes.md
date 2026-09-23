@@ -1,13 +1,12 @@
 ## Downloads
 
-| File | Language | UI assets |
-|------|----------|-----------|
-| `ems-@VERSION@.tapp` | German | loaded from the CDN (default) |
-| `ems-@VERSION@-en.tapp` | English | loaded from the CDN |
-| `ems-@VERSION@-self.tapp` | German | packed into the `.tapp` — for networks without internet access |
-| `ems-@VERSION@-en-self.tapp` | English | packed into the `.tapp` — for networks without internet access |
+| File | UI language |
+|------|-------------|
+| `ems-@VERSION@.tapp` | German |
+| `ems-@VERSION@-en.tapp` | English |
 
-Pick **one** file.
+Pick **one** file. The UI assets load from the CDN, so the browser needs
+internet access.
 
 ## Installing
 

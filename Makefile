@@ -27,11 +27,10 @@ endif
 # Berry sources, flattened into the .tapp root (tests live in tests/, not here)
 BERRY_SRC := $(wildcard $(BACKEND_DIR)/*.be $(BACKEND_DIR)/integrations/*.be)
 
-# Frontend build (Vite). The UI JS/CSS is served from a CDN by default; only
-# the index.html shell is packed into the .tapp. Override the asset source and
-# CDN host on the command line, e.g.:
+# Frontend build (Vite). The UI JS/CSS and lang.json are always served from a
+# CDN; only the index.html shell is packed into the .tapp. Override the asset
+# source and CDN host on the command line, e.g.:
 #   make                              # CDN (GitHub Pages) — default
-#   make build-self                   # self-host: bundle assets into the .tapp
 #   make build-dev                    # shell loads from a `make dev` server
 #   make CDN_BASE_URL=https://cdn.ex  # point at a different CDN host
 #   make build-dev DEV_SERVER_URL=http://192.168.1.5:5173  # override NIC
@@ -40,19 +39,18 @@ CDN_BASE_URL   ?= https://gplug-ch.github.io/gplug-cdn
 # empty -> Vite auto-detects this machine's LAN IP (dev shell runs on the device)
 DEV_SERVER_URL ?=
 
-# Output file: non-German builds get a -<lang> suffix, self-host builds a
-# -self suffix, so all release variants can sit side by side:
-#   ems-v1.2.0.tapp  ems-v1.2.0-en.tapp  ems-v1.2.0-self.tapp  ems-v1.2.0-en-self.tapp
-TAPP_SUFFIX := $(if $(filter-out de,$(UILANG)),-$(UILANG))$(if $(filter self,$(ASSET_BASE)),-self)
+# Output file (non-German builds get a -<lang> suffix, so the release
+# variants ems-v1.2.0.tapp and ems-v1.2.0-en.tapp can sit side by side)
+TAPP_SUFFIX := $(if $(filter-out de,$(UILANG)),-$(UILANG))
 TAPP := $(BUILD_DIR)/$(TARGET)-$(VERSION)$(TAPP_SUFFIX).tapp
 
 # `make release` collects the .tapps here (build/ is wiped by every build).
 RELEASE_DIR := release
 GH_REPO_URL := https://github.com/jluthiger/gplug-ems
 
-# Vite output dir carrying the shell we pack (self/dev modes have own subdirs).
+# Vite output dir carrying the shell we pack (dev mode has its own subdir).
 ifeq ($(ASSET_BASE),self)
-FRONTEND_DIST := $(FRONTEND_DIR)/dist/self
+$(error ASSET_BASE=self was removed: the UI is always served from the CDN (use ASSET_BASE=cdn, dev or a mirror URL))
 else ifeq ($(ASSET_BASE),dev)
 FRONTEND_DIST := $(FRONTEND_DIR)/dist/dev
 else
@@ -60,7 +58,7 @@ FRONTEND_DIST := $(FRONTEND_DIR)/dist/$(VERSION)
 endif
 
 .DEFAULT_GOAL := build
-.PHONY: build build-self build-dev dev test test-backend test-frontend \
+.PHONY: build build-dev dev test test-backend test-frontend \
 	release deploy-cdn flash sim-run sim-test sim-ui clean help \
 	minify frontend tapp guard-release
 
@@ -69,9 +67,6 @@ endif
 # =============================================================================
 
 build: clean tapp ## Build build/ems-v<version>.tapp (CDN shell; LANG=en for English)
-
-build-self: ## Build a self-hosted .tapp (JS/CSS + lang.json packed in, no CDN)
-	@"$(MAKE)" build ASSET_BASE=self
 
 # The shell loads the UI from a local `make dev` server (HMR), for developing
 # against a real device. Flash the .tapp, run `make dev` and open the device IP
@@ -91,17 +86,13 @@ minify:
 	@echo "Minification complete"
 
 # Build the UI with Vite (hashed, minified, versioned) and pack only the shell.
-# Only ASSET_BASE=self packs lang.json (~23 KB): that is the one mode whose
-# shell fetches it on-device via /fs?name=lang.json. CDN/mirror builds get it
-# from the bundle host (Vite emits it into the versioned dist dir next to the
-# JS/CSS) and dev builds from the `make dev` server, so packing it there
-# would cost a quarter of the .tapp for a path nobody takes — if the bundle
-# host is unreachable the JS is gone too and the UI cannot boot at all. The
-# device reads its build language from <html lang> in index.html instead
-# (webservice.be _scan_language). bundle.py --lang-only always runs: it emits
-# the line-per-key file for the device's line-by-line reader AND runs the i18n
-# completeness check (FR-203/204), which must gate every build regardless of
-# where the dictionary is served from.
+# lang.json (~23 KB) is never packed: CDN/mirror builds get it from the bundle
+# host (Vite emits it into the versioned dist dir next to the JS/CSS) and dev
+# builds from the `make dev` server — if the bundle host is unreachable the JS
+# is gone too and the UI cannot boot at all. The device reads its build
+# language from <html lang> in index.html instead (webservice.be
+# _scan_language). bundle.py --lang-only still runs for the i18n completeness
+# check (FR-203/204), which gates every build; its output is discarded.
 frontend:
 	@mkdir -p $(BUILD_DIR)
 	@echo "Building frontend (lang=$(UILANG), assets=$(ASSET_BASE))..."
@@ -109,20 +100,10 @@ frontend:
 	cd $(FRONTEND_DIR) && APP_VERSION=$(VERSION) UILANG=$(UILANG) \
 		ASSET_BASE=$(ASSET_BASE) CDN_BASE_URL=$(CDN_BASE_URL) \
 		DEV_SERVER_URL=$(DEV_SERVER_URL) KEEP_DIST=$(KEEP_DIST) npm run build
-	@if [ "$(ASSET_BASE)" = "self" ]; then \
-		python3 $(FRONTEND_DIR)/bundle.py --lang-only --quiet \
-			--lang $(UILANG) --langout $(BUILD_DIR)/lang.json; \
-	else \
-		echo "$(ASSET_BASE) mode: lang.json served off-device, not packed into the .tapp"; \
-		python3 $(FRONTEND_DIR)/bundle.py --lang-only --quiet \
-			--lang $(UILANG) --langout $(BUILD_DIR)/.lang-check.json \
-			&& rm -f $(BUILD_DIR)/.lang-check.json; \
-	fi
+	python3 $(FRONTEND_DIR)/bundle.py --lang-only --quiet \
+		--lang $(UILANG) --langout $(BUILD_DIR)/.lang-check.json \
+		&& rm -f $(BUILD_DIR)/.lang-check.json
 	cp $(FRONTEND_DIST)/index.html $(BUILD_DIR)/index.html
-	@if [ "$(ASSET_BASE)" = "self" ]; then \
-		echo "self-host mode: packing lang.json + hashed JS/CSS into the .tapp"; \
-		cp $(FRONTEND_DIST)/*.js $(FRONTEND_DIST)/*.css $(BUILD_DIR)/; \
-	fi
 	@cp VERSION.txt $(BUILD_DIR)/VERSION.txt
 
 tapp: minify frontend
@@ -184,15 +165,14 @@ release-variant = @"$(MAKE)" build LANG=$(1) ASSET_BASE=$(2) KEEP_DIST=$(3) \
 #   2. publish that bundle to the gplug-cdn repo (GitHub Pages) so the CDN URL
 #      baked into index.html resolves — needs push access to
 #      github.com/gplug-ch/gplug-cdn (see ems/README.md)
-#   3. build the German and English self-host .tapps
-#   4. create the GitHub Release v<version> (gh creates the tag on HEAD) with
-#      all four .tapps; notes = .github/release-notes.md + the PR list that
+#   3. create the GitHub Release v<version> (gh creates the tag on HEAD) with
+#      both .tapps; notes = .github/release-notes.md + the PR list that
 #      --generate-notes groups via .github/release.yml
 # Every sub-make names LANG and ASSET_BASE explicitly: a command-line value
 # would otherwise leak into all of them via MAKEFLAGS.
 #   make release            # the real thing
 #   make release DRYRUN=1   # build the assets + notes into release/, publish nothing
-release: guard-release ## Build all .tapps, publish the CDN bundle + GitHub Release (DRYRUN=1)
+release: guard-release ## Build de+en .tapps, publish the CDN bundle + GitHub Release (DRYRUN=1)
 	@rm -rf $(RELEASE_DIR) && mkdir -p $(RELEASE_DIR)
 	$(call release-variant,de,cdn,)
 	$(call release-variant,en,cdn,1)
@@ -201,8 +181,6 @@ ifeq ($(DRYRUN),)
 else
 	@echo "DRYRUN: skipping CDN deploy"
 endif
-	$(call release-variant,de,self,)
-	$(call release-variant,en,self,)
 	@sed 's/@VERSION@/$(VERSION)/g' .github/release-notes.md > $(RELEASE_DIR)/NOTES.md
 	@ls -l $(RELEASE_DIR)
 	@set -- gh release create "$(VERSION)" $(RELEASE_DIR)/*.tapp \
@@ -250,6 +228,6 @@ clean: ## Remove the build directory
 	@echo "Build directory cleaned"
 
 help: ## List the targets
-	@echo "Usage: make [target] [LANG=en] [ASSET_BASE=cdn|self|dev] [DEVICE=<ip>] [DRYRUN=1]"
+	@echo "Usage: make [target] [LANG=en] [ASSET_BASE=cdn|dev|<mirror-url>] [DEVICE=<ip>] [DRYRUN=1]"
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'

@@ -7,9 +7,10 @@ This guide covers how to set up, configure, and run the gPlug Energy Management 
 | Requirement | Purpose |
 |-------------|---------|
 | Docker + Docker Compose | Running the simulator |
-| Node.js + Yarn | Building the simulator frontend (dev only) |
-| Java 21 + Gradle | Running the simulator locally without Docker (dev only) |
-| Berry CLI + Python 3 | Building the EMS `.tapp` yourself (dev only — releases ship it prebuilt) |
+| Node.js + Yarn 4 | Building the simulator frontend (dev only) |
+| Java 21 | Running the simulator locally without Docker (dev only; Gradle comes via `./gradlew`) |
+| Node.js + npm, Python 3 | Building the EMS `.tapp` yourself (dev only — releases ship it prebuilt) |
+| Berry CLI | Running the EMS backend tests, `make test` (dev only) |
 | gPlug ESP32 (Tasmota) | Production deployment |
 
 ---
@@ -29,6 +30,8 @@ cd simulator/frontend
 yarn install
 yarn deploy   # builds and copies dist/ → simulator/backend/src/main/resources/static/
 ```
+
+(`make sim-ui` at the repo root does the same.)
 
 ### 2. Build and start the Docker container
 
@@ -62,7 +65,7 @@ simulator:
           name: "Grid Export"
       productions:
         - id: "pv-1"
-          productionType: PV
+          productionType: PHOTOVOLTAIC
           maxPower: 50000
       loads:
         - id: "heatpump-1"
@@ -89,9 +92,12 @@ Create a `site.json` for your gPlug device. Start from one of the examples in `e
 
 | Example | Description |
 |---------|-------------|
-| `site-1.json` | All devices via simulator integration |
-| `site-gplug.json` | Native gPlug grid + Home Assistant PV |
-| `site-ha.json` | Home Assistant grid, PV, and Shelly loads |
+| `site-1.json` | Simulator grid, PV and battery; simulator loads plus one Shelly relay load |
+| `site-2.json`, `site-3.json` | Simulator grid and loads only (no productions) |
+| `site-gplug.json` | Native gPlug grid; PV via Home Assistant and a gPlug-attached SMA inverter (SunSpec), gPlug battery; simulator loads |
+| `site-ha.json` | Home Assistant grid, PV and battery; simulator loads plus one Shelly load |
+| `site-shelly.json` | Same as `site-1.json` (Shelly relay load, simulator for the rest) |
+| `site-modbustcp.json` | Modbus TCP PV and battery, standalone `modbusRegisters` (submeters) |
 
 Key fields:
 
@@ -134,39 +140,37 @@ Key fields:
 }
 ```
 
-**Supported integrations:** `simulator`, `homeassistant`, `shelly`, `gplug`
+**Supported integrations:** `simulator`, `homeassistant`, `shelly` (loads only), `gplug`, `modbustcp`
 
-**Load types:** `BOILER`, `HEATPUMP`, `WALLBOX`, `DRYER`
+**Load types:** `ELECTRICITY`, `HEATPUMP`, `DRYER`, `WALLBOX` (the choices in Einstellungen; the EMS itself does not evaluate `loadType`, and the simulator additionally knows `BOILER`)
 
 **Production types:** `PHOTOVOLTAIC`, `BATTERY`
 
 ### 2. Get the `.tapp`
 
 Download it from the [latest GitHub Release](https://github.com/jluthiger/gplug-ems/releases/latest).
-Each release carries four variants — pick one:
-
-| File | Language | UI assets |
-|------|----------|-----------|
-| `ems-v<VERSION>.tapp` | German | loaded from the CDN (default) |
-| `ems-v<VERSION>-en.tapp` | English | loaded from the CDN |
-| `ems-v<VERSION>-self.tapp` | German | packed in — networks without internet access |
-| `ems-v<VERSION>-en-self.tapp` | English | packed in — networks without internet access |
+Pick one: `ems-v<VERSION>.tapp` (German UI) or `ems-v<VERSION>-en.tapp`
+(English UI). Either way the device loads the UI assets from the CDN, so the
+browser needs internet access.
 
 Or build it yourself (repo root): `make` → `build/ems-v<VERSION>.tapp`
-(`make LANG=en`, `make build-self` for the other variants).
+(`make LANG=en` for English).
 
 ### 3. Deploy to the gPlug device
 
-1. Open the Tasmota web UI at `http://<gplug-ip>/` → **Tools → Manage File system**
-2. **Delete every existing `ems-*.tapp` first** — Tasmota starts every `.tapp`
-   in the root, so an old one left next to the new one boots both apps and
-   reboot-loops an ESP32-C3
-3. Upload the new `.tapp` and your `site.json` there
+```sh
+make flash DEVICE=<gplug-ip>   # removes stale .tapp files, then uploads the new one (DRYRUN=1 to preview)
+```
+
+Or manually:
+
+1. Open the Tasmota web UI at `http://<gplug-ip>/`
+2. Go to **Tools → Manage File system**, delete any older `ems-v*.tapp` (Tasmota boots every `.tapp` in the root) and upload the new `.tapp`
+3. Upload your `site.json` via the same filesystem manager (it can later be edited in the EMS UI under **Einstellungen**)
 4. Restart the device
 
-From a checkout, `make flash DEVICE=<gplug-ip>` (own build) or
-`ems/backend/deploy.sh <gplug-ip> <file.tapp>` (downloaded release) does steps 1–4
-except the `site.json` upload.
+For a downloaded release, `ems/backend/deploy.sh <gplug-ip> <file.tapp>` (from a
+checkout) does the same as `make flash`.
 
 ### 4. Access the EMS frontend
 
@@ -176,7 +180,7 @@ Once the device is running, the Preact UI is available at:
 http://<gplug-ip>/app
 ```
 
-This dashboard shows all loads and productions, their current states, and allows manual state transitions.
+Pages: **Übersicht** (live grid, productions and loads; manual state transitions), **Verlauf** (energy and cost history), **Zähler** (smart-meter values, shown when the device has meter data), **Modbus** (standalone Modbus registers, shown when configured) and **Einstellungen** (site, loads, productions, grid, Modbus, tariffs, data, gPlug and pro settings).
 
 ---
 
@@ -197,5 +201,7 @@ This dashboard shows all loads and productions, their current states, and allows
 | Simulator Swagger UI | `http://localhost:9090/simulator/swagger-ui.html` |
 | Download EMS `.tapp` | https://github.com/jluthiger/gplug-ems/releases/latest |
 | Build EMS `.tapp` | `make` (repo root) |
+| Upload `.tapp` to a device | `make flash DEVICE=<gplug-ip>` |
+| Run simulator without Docker | `make sim-run` |
 | EMS frontend (on device) | `http://<gplug-ip>/app` |
 | Tasmota admin UI | `http://<gplug-ip>/` |

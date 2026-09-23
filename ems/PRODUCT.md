@@ -51,15 +51,16 @@ Two positions a neighbouring product could not truthfully copy:
 
 ## Operating Context
 
-- **Runtime:** Preact SPA, no build step required for the device; a Vite build bakes versioned
-  CDN URLs into a tiny `index.html` shell served from the `.tapp`. The JS/CSS bundle loads from
-  Cloudflare Pages in CDN mode; `make build-self` packs assets into the `.tapp` for
-  offline/restricted networks.
-- **Network:** local LAN only; the frontend polls the device (`/loads`, `/productions` every 2 s;
-  raw `/api/*` for analytics). Each device is standalone.
+- **Runtime:** Preact SPA; a Vite build bakes versioned CDN URLs into a tiny `index.html` shell
+  served from the `.tapp`. The JS/CSS bundle and `lang.json` load from GitHub Pages
+  (gplug-ch/gplug-cdn); there is no self-hosted build, so the browser needs internet access.
+- **Network:** local LAN only; the frontend polls the device (`/api/power`, `/loads`, `/productions`
+  every 10 s on Übersicht; raw `/api/energy` synced into the browser's IndexedDB archive every
+  15 min, since the device keeps only 30 days). Each device is standalone.
 - **Pages (routes):** Übersicht (live monitor), Verlauf (history/cost table + CSV), Zähler
   (smart-meter detail), Modbus (standalone Modbus registers), Einstellungen (Site/Lasten/
-  Produktion/Netzanschluss/Tarife/Daten). See `frontend/src/pages/`.
+  Produktion/Netzanschluss/Modbus/Tarife/Daten/gPlug/Pro — gPlug: restart + WLAN, Pro: raw
+  `site.json` editor). Zähler and Modbus only appear in the nav when the device has data for them. See `frontend/src/pages/`.
 - **Data reality to design for:** device RTC may be unsynced (time caveat banner); connection can
   drop (auto-retry offline state); slots may be *partial* (a sensor failed during the slot — shown
   as such, never zero-filled); pure-export/holiday and null-power scenarios are normal.
@@ -67,15 +68,17 @@ Two positions a neighbouring product could not truthfully copy:
 ## Capabilities and Constraints
 
 - **C-2 No external servers.** The shipped UI transmits no data to third parties — a legal/privacy
-  requirement («Es werden keine Daten an externe Server übertragen»). No telemetry, no third-party
-  fonts/CDN scripts in self-host mode.
+  requirement («Es werden keine Daten an externe Server übertragen»). No telemetry. The UI code itself
+  (JS/CSS/`lang.json`) is loaded from the project CDN (GitHub Pages); no site data is sent there.
 - **C-3 Device limits.** ESP32 flash + RAM are tight. Total on-device UI assets (html+js+css+i18n)
-  ≤ **150 KB uncompressed**; flash writes ≤ 1 per 15 min per file; RAM timeseries are fixed-capacity
+  ≤ **150 KB uncompressed** (met by construction: the `.tapp` ships only the ~0.5 KB
+  `index.html` shell, the bundle is served from the CDN); flash writes ≤ 1 per 15 min per file; RAM timeseries are fixed-capacity
   ring buffers. Design and dependency choices must respect this budget.
-- **HTTP API is GET-only** (Richardson maturity level 1). State transitions and setpoints travel as
+- **HTTP API is GET-only** except `POST /api/config` (Richardson maturity level 1). State transitions travel as
   query params. The browser owns all derived analytics (see Positioning #1).
-- **C-4 Language.** All shipped user-facing text is **German**, via i18n keys, consistent with the
-  binding glossary (below). English (`en.json`) is **dev/reference only** — only German ships.
+- **C-4 Language.** All user-facing text goes through i18n keys; **German** (`de.json`) is the
+  default build and the authoritative dictionary, consistent with the binding glossary (below).
+  `make LANG=en` builds an English variant from `en.json` (missing keys fall back to German).
   Design for German copy lengths; no mixed-language UI.
 - **Binding terminology (glossary).** Terms are fixed and must not be used interchangeably. Notably
   **«Verbrauch» ≠ «Lasten»**: Verbrauch is total site consumption; Lasten are only the EMS-controllable
