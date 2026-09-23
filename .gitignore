@@ -4,6 +4,8 @@ private/
 .claude/worktrees
 ems/frontend/.yarn/
 ems/frontend/.yarnrc.yml
-simulator/frontend/.yarn/install-state.gz
+simulator/frontend/.yarn/
+simulator/frontend/.yarnrc.yml
+simulator/frontend/.pnp.*
 build/
 release/
