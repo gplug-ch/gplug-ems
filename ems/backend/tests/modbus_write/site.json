@@ -1,0 +1,24 @@
+{
+  "id": "s", "name": "modbus write fixture",
+  "loads": [
+    {"id": "boiler", "priority": 1, "currentPower": 500, "state": "WAITING",
+     "integration": "modbustcp", "url": "10.0.0.9:502", "unit": 1,
+     "state_register": 1100,
+     "write": {"register": 1100, "dtype": "uint16", "on": 2, "off": 1, "inactive": 0}},
+    {"id": "relay", "priority": 2, "currentPower": 300, "state": "WAITING",
+     "integration": "modbustcp", "url": "10.0.0.9:502", "unit": 1,
+     "state_register": 1200, "write": {"register": 1200, "on": 1, "off": 0}}
+  ],
+  "productions": [
+    {"id": "bat", "productionType": "BATTERY", "integration": "modbustcp",
+     "url": "10.0.0.9:502", "function": 4, "register": 200, "dtype": "int16",
+     "soc_register": 201, "soc_scale": 0.1},
+    {"id": "pv", "productionType": "PHOTOVOLTAIC", "integration": "modbustcp",
+     "url": "10.0.0.9:502", "function": 4, "register": 106, "dtype": "float32",
+     "energy_register": 120, "energy_dimension": "kWh", "energy_scale": 0.01}
+  ],
+  "grid": [
+    {"id": "from", "integration": "modbustcp", "url": "10.0.0.9:502",
+     "function": 4, "register": 300, "dtype": "int32"}
+  ]
+}

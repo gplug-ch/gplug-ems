@@ -98,6 +98,8 @@ Create a `site.json` for your gPlug device. Start from one of the examples in `e
 | `site-ha.json` | Home Assistant grid, PV and battery; simulator loads plus one Shelly load |
 | `site-shelly.json` | Same as `site-1.json` (Shelly relay load, simulator for the rest) |
 | `site-modbustcp.json` | Modbus TCP PV and battery, standalone `modbusRegisters` (submeters) |
+| `site-modbus-all.json` | Every item over Modbus TCP: PV with energy counter, battery with SoC, grid as one signed register, loads switched by a register write or a coil |
+| `site-sim-modbus.json` | The simulator's Modbus TCP server (port 5020): PV, battery + SoC, grid and a switched boiler |
 
 Key fields:
 
@@ -141,6 +143,8 @@ Key fields:
 ```
 
 **Supported integrations:** `simulator`, `homeassistant`, `shelly` (loads only), `gplug`, `modbustcp`
+
+**Switching a load over Modbus TCP:** give the load a `"write"` block — `{"register": 1100, "dtype": "uint16", "on": 1, "off": 0}` (optional `"inactive"` value for a deselected load, `"function"` 6/16/5). An optional `"state_register"` reads the on/off state back.
 
 **Load types:** `ELECTRICITY`, `HEATPUMP`, `DRYER`, `WALLBOX` (the choices in Einstellungen; the EMS itself does not evaluate `loadType`, and the simulator additionally knows `BOILER`)
 

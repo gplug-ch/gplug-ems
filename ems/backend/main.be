@@ -23,7 +23,7 @@ _load_integrations = def ()
         var cfg = json.load(f.read())
         f.close()
         if cfg == nil return end
-        for key : ['loads', 'productions', 'grid']
+        for key : ['loads', 'productions', 'grid', 'modbusRegisters']
             var arr = cfg.find(key, nil)
             if isinstance(arr, list)
                 for item : arr

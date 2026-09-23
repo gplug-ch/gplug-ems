@@ -53,6 +53,13 @@ import * as archive from '../lib/archive.js';
     { value: '4', label: '4 – Read Input Register (0x04)' }
   ];
   var MODBUS_DTYPES = ['float32', 'int16', 'uint16', 'int32', 'uint32'];
+  /* load switching (issue #20): FC 6 single register, FC 16 multiple
+     registers, FC 5 coil; blank = the device picks 6/16 by dtype */
+  var MODBUS_WRITE_FUNCTIONS = [
+    { value: '6', label: '6 – Write Single Register (0x06)' },
+    { value: '16', label: '16 – Write Multiple Registers (0x10)' },
+    { value: '5', label: '5 – Write Single Coil (0x05)' }
+  ];
   /* gplug energy counter unit (issue #14); blank = follow the power unit */
   var ENERGY_DIMENSIONS = ['Wh', 'kWh'];
 
@@ -197,14 +204,41 @@ import * as archive from '../lib/archive.js';
   /* same numeric-coercion / blank-dropping treatment as the standalone
      "modbusRegisters" tab's own serialize step, but for a load/production/
      grid item that picked "modbustcp" as its integration */
+  var MODBUS_EXTRA_NUM_KEYS = ['soc_register', 'soc_scale', 'energy_register', 'energy_scale',
+    'state_register'];
+  var MODBUS_EXTRA_STR_KEYS = ['soc_dtype', 'energy_dtype', 'energy_dimension'];
   function dropBlankModbusKeys(item) {
     if (!isObj(item) || item.integration !== 'modbustcp') return item;
     var o = Object.assign({}, item);
     o.function = Number(o.function || 3);
-    if (!isBlank(o.register)) o.register = Number(o.register);
+    /* a load may be read by its state register alone (issue #20) */
+    if (isBlank(o.register)) delete o.register; else o.register = Number(o.register);
     if (isBlank(o.unit)) delete o.unit; else o.unit = Number(o.unit);
     if (isBlank(o.scale) || Number(o.scale) === 1) delete o.scale; else o.scale = Number(o.scale);
     if (o.swap_words !== true) delete o.swap_words;
+    MODBUS_EXTRA_NUM_KEYS.forEach(function (k) {
+      if (!(k in o)) return;
+      if (isBlank(o[k])) delete o[k]; else o[k] = Number(o[k]);
+    });
+    MODBUS_EXTRA_STR_KEYS.forEach(function (k) {
+      if (k in o && isBlank(o[k])) delete o[k];
+    });
+    if (o.productionType !== undefined && !isBatteryType(o.productionType)) {
+      delete o.soc_register; delete o.soc_dtype; delete o.soc_scale;
+    }
+    /* the "write" block exists only with a register; its numbers go as numbers */
+    if ('write' in o) {
+      var w = isObj(o.write) ? Object.assign({}, o.write) : {};
+      if (isBlank(w.register)) {
+        delete o.write;
+      } else {
+        ['register', 'on', 'off', 'inactive', 'function'].forEach(function (k) {
+          if (isBlank(w[k])) delete w[k]; else w[k] = Number(w[k]);
+        });
+        if (isBlank(w.dtype)) delete w.dtype;
+        o.write = w;
+      }
+    }
     return o;
   }
 
@@ -253,12 +287,29 @@ import * as archive from '../lib/archive.js';
      standalone Modbus tab AND any load/production/grid item that picks
      "modbustcp" as its integration (backend accepts it per-item, see
      integrations/modbustcp.be's docstring). */
+  function badScale(v) { return !isBlank(v) && (!isNum(v) || Number(v) === 0); }
   function modbusIntegErrors(item, e) {
     if (!isHostPort(item.url)) e.url = 'settings.err.modbus_url';
-    if (!isPosInt(item.register, 0)) e.register = 'settings.err.modbus_register';
+    /* a load may be read by its state register alone (issue #20) */
+    var stateOnly = isBlank(item.register) && !isBlank(item.state_register);
+    if (!stateOnly && !isPosInt(item.register, 0)) e.register = 'settings.err.modbus_register';
+    ['soc_register', 'energy_register', 'state_register'].forEach(function (k) {
+      if (!isBlank(item[k]) && !isPosInt(item[k], 0)) e[k] = 'settings.err.modbus_register';
+    });
     if (!isBlank(item.unit) && !isPosInt(item.unit, 1, 247)) e.unit = 'settings.err.modbus_unit';
-    if (!isBlank(item.scale) && (!isNum(item.scale) || Number(item.scale) === 0)) {
-      e.scale = 'settings.err.modbus_scale';
+    ['scale', 'soc_scale', 'energy_scale'].forEach(function (k) {
+      if (badScale(item[k])) e[k] = 'settings.err.modbus_scale';
+    });
+    if (!isBlank(item.energy_dimension) && ENERGY_DIMENSIONS.indexOf(item.energy_dimension) < 0) {
+      e.energy_dimension = 'settings.err.energy_dimension';
+    }
+    /* load switching: a blank write register means «not switched» */
+    var w = item.write;
+    if (isObj(w) && !isBlank(w.register)) {
+      if (!isPosInt(w.register, 0)) e['write.register'] = 'settings.err.modbus_register';
+      ['on', 'off', 'inactive'].forEach(function (k) {
+        if (!isBlank(w[k]) && !isNum(w[k])) e['write.' + k] = 'settings.err.modbus_value';
+      });
     }
   }
 
@@ -368,11 +419,16 @@ import * as archive from '../lib/archive.js';
   /* modbustcp item (load/production/grid): "url" is host:port (no scheme),
      "register" a required non-negative integer — same shape the standalone
      modbusRegisters loop above already checks */
+  function badRegister(v) { return !isNumber(v) || v < 0 || Math.floor(v) !== v; }
   function checkModbusItem(it, p, out) {
     if (typeof it.url !== 'string' || !isHostPort(it.url)) out.push({ path: p + '.url', key: DOC_ERR.url });
-    if (it.register === undefined || it.register === null || !isNumber(it.register) ||
-        it.register < 0 || Math.floor(it.register) !== it.register) {
+    /* a load may be read by its state register alone (issue #20) */
+    var stateOnly = (it.register === undefined || it.register === null) && isNumber(it.state_register);
+    if (!stateOnly && badRegister(it.register)) {
       out.push({ path: p + '.register', key: DOC_ERR.modbus_register });
+    }
+    if (isObj(it.write) && badRegister(it.write.register)) {
+      out.push({ path: p + '.write.register', key: DOC_ERR.modbus_register });
     }
   }
 
@@ -696,7 +752,52 @@ export {
         <input type="checkbox" class="toggle" checked=${m.swap_words === true}
           onChange=${function (e) { props.patch('swap_words', e.target.checked); }} />
         <span>${t('settings.modbus.swap_words')}</span>
-      </label>`;
+      </label>
+      ${props.kind === 'production' ? html`
+        <${Field} label=${t('settings.modbus.energy_register')} type="number" step="1" min="0"
+          value=${m.energy_register} error=${errors.energy_register} onInput=${set('energy_register')} />
+        <${SelectField} label=${t('settings.modbus.energy_dtype')} value=${m.energy_dtype || 'uint32'}
+          options=${opt(MODBUS_DTYPES)} onChange=${set('energy_dtype')} />
+        <${Field} label=${t('settings.modbus.energy_scale')} type="number" step="any" value=${m.energy_scale}
+          placeholder="1" error=${errors.energy_scale} onInput=${set('energy_scale')} />
+        <${SelectField} label=${t('settings.energy_dimension')} value=${m.energy_dimension || ''}
+          options=${[{ value: '', label: t('settings.energy_dimension_auto') }].concat(opt(ENERGY_DIMENSIONS))}
+          onChange=${set('energy_dimension')} />` : null}
+      ${props.kind === 'load' ? html`<${ModbusLoadFields} item=${m} errors=${errors} patch=${props.patch} />` : null}`;
+  }
+
+  /* modbustcp load extras (issue #20): the on/off state register and the
+     "write" block the EMS switches the load with */
+  function ModbusLoadFields(props) {
+    var m = props.item;
+    var errors = props.errors;
+    var w = isObj(m.write) ? m.write : {};
+    function setWrite(k) {
+      return function (v) {
+        var nw = Object.assign({}, w);
+        nw[k] = v;
+        props.patch('write', nw);
+      };
+    }
+    return html`
+      <${Field} label=${t('settings.modbus.state_register')} type="number" step="1" min="0"
+        value=${m.state_register} error=${errors.state_register}
+        onInput=${function (v) { props.patch('state_register', v); }} />
+      <div class="settings-subhead">${t('settings.modbus.write_head')}</div>
+      <${Field} label=${t('settings.modbus.write_register')} type="number" step="1" min="0"
+        value=${w.register} error=${errors['write.register']} onInput=${setWrite('register')} />
+      <${SelectField} label=${t('settings.modbus.dtype')} value=${w.dtype || 'uint16'}
+        options=${opt(MODBUS_DTYPES)} onChange=${setWrite('dtype')} />
+      <${SelectField} label=${t('settings.modbus.write_function')}
+        value=${w.function === undefined || w.function === null ? '' : String(w.function)}
+        options=${[{ value: '', label: t('settings.modbus.write_function_auto') }].concat(MODBUS_WRITE_FUNCTIONS)}
+        onChange=${setWrite('function')} />
+      <${Field} label=${t('settings.modbus.write_on')} type="number" step="any" value=${w.on}
+        placeholder="1" error=${errors['write.on']} onInput=${setWrite('on')} />
+      <${Field} label=${t('settings.modbus.write_off')} type="number" step="any" value=${w.off}
+        placeholder="0" error=${errors['write.off']} onInput=${setWrite('off')} />
+      <${Field} label=${t('settings.modbus.write_inactive')} type="number" step="any" value=${w.inactive}
+        error=${errors['write.inactive']} onInput=${setWrite('inactive')} />`;
   }
 
   /* ---------- Loads tab ---------- */
@@ -741,7 +842,7 @@ export {
             <${Field} label=${t('settings.url.off')} value=${url.off} error=${errors['url.off']} onInput=${setUrl('off')} />
             <${Field} label=${t('settings.url.status')} value=${url.status} error=${errors['url.status']} onInput=${setUrl('status')} />`
           : integ === 'modbustcp' ? html`
-            <${ModbusIntegFields} item=${load} errors=${errors} patch=${props.patch} />`
+            <${ModbusIntegFields} kind="load" item=${load} errors=${errors} patch=${props.patch} />`
           : html`
             <${Field} label=${t('settings.url')} value=${load.url} error=${errors.url} onInput=${set('url')} />
             ${integ === 'homeassistant' ? html`
@@ -792,7 +893,7 @@ export {
             <${Field} label=${t('settings.energy_scale_field')} value=${p.energy_scale_field} placeholder=${scaleFieldHint(p.energy_field)} error=${errors.energy_scale_field} onInput=${set('energy_scale_field')} />
             <${Field} label=${t('settings.energy_scale_base')} type="number" step="1" min="-10" value=${p.energy_scale_base} placeholder="0" error=${errors.energy_scale_base} onInput=${set('energy_scale_base')} />`
           : integ === 'modbustcp' ? html`
-            <${ModbusIntegFields} item=${p} errors=${errors} patch=${props.patch} />`
+            <${ModbusIntegFields} kind="production" item=${p} errors=${errors} patch=${props.patch} />`
           : html`
             <${Field} label=${t('settings.url')} value=${p.url} error=${errors.url} onInput=${set('url')} />
             ${integ === 'homeassistant' ? html`
@@ -809,6 +910,11 @@ export {
               <${Field} label=${t('settings.soc_field')} value=${p.soc_field} placeholder="ChaState" error=${errors.soc_field} onInput=${set('soc_field')} />
               <${Field} label=${t('settings.soc_scale_field')} value=${p.soc_scale_field} placeholder=${scaleFieldHint(p.soc_field)} error=${errors.soc_scale_field} onInput=${set('soc_scale_field')} />
               <${Field} label=${t('settings.soc_scale_base')} type="number" step="1" min="-10" value=${p.soc_scale_base} placeholder="0" error=${errors.soc_scale_base} onInput=${set('soc_scale_base')} />`
+            : integ === 'modbustcp' ? html`
+              <${Field} label=${t('settings.modbus.soc_register')} type="number" step="1" min="0" value=${p.soc_register} error=${errors.soc_register} onInput=${set('soc_register')} />
+              <${SelectField} label=${t('settings.modbus.soc_dtype')} value=${p.soc_dtype || 'uint16'}
+                options=${opt(MODBUS_DTYPES)} onChange=${set('soc_dtype')} />
+              <${Field} label=${t('settings.modbus.soc_scale')} type="number" step="any" value=${p.soc_scale} placeholder="1" error=${errors.soc_scale} onInput=${set('soc_scale')} />`
             : integ !== 'simulator' ? html`
               <${Field} label=${t('settings.soc_url')} value=${p.soc_url} error=${errors.soc_url} onInput=${set('soc_url')} />` : null}
             <label class="toggle-wrap">
@@ -850,7 +956,7 @@ export {
             <${Field} label=${t('settings.stale_after')} type="number" step="1" min="1" value=${g.stale_after} placeholder="600" error=${errors.stale_after} onInput=${set('stale_after')} />
             <${Field} label=${t('settings.energy_field')} value=${g.energy_field} placeholder="E_AC" error=${errors.energy_field} onInput=${set('energy_field')} />`
           : integ === 'modbustcp' ? html`
-            <${ModbusIntegFields} item=${g} errors=${errors} patch=${props.patch} />`
+            <${ModbusIntegFields} kind="grid" item=${g} errors=${errors} patch=${props.patch} />`
           : html`
             <${Field} label=${t('settings.url')} value=${g.url} error=${errors.url} onInput=${set('url')} />
             ${integ === 'homeassistant' ? html`

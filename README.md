@@ -71,8 +71,8 @@ http://<gplug-ip>/app
 **Loads.** A load the EMS may switch must be in state `waiting`. Whenever the PV
 surplus covers its power, the EMS activates it, highest priority (lowest number)
 first, and returns it to `waiting` once the surplus is gone and its minimum
-runtime has passed. `inactive` loads are left alone. Only `shelly` and
-`simulator` loads can actually be switched.
+runtime has passed. `inactive` loads are left alone. Only `shelly`,
+`simulator` and `modbustcp` loads can actually be switched.
 
 **Integrations.** Each load, production and the grid names where its values come
 from: `gplug` (the gPlug's own smart-meter or attached-inverter data),

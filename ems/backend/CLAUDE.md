@@ -86,14 +86,14 @@ raw)` — Berry drops the excess arguments on the zero-arg hooks.
 
 ### Integrations (`integrations/`)
 
-Selected per item by its `integration` key; each module exports `fetch_item(url, token, cfg)` (returns only the fields it read, or nil) and `set_state(url, token, state)`. Common item keys handled in `site.be`: `url`, `token`, `invert` (flip the sign), `soc_url` (battery SoC from a second entity, own poll slot), `dimension` (`"kW"` → ×1000). The per-integration options are documented in the root `CLAUDE.md` (Integrations table).
+Selected per item by its `integration` key; each module exports `fetch_item(url, token, cfg)` (returns only the fields it read, or nil) and `set_state(url, token, state, cfg)` (`site._actuate_load` passes the load map as `cfg`; shelly/simulator ignore it). Common item keys handled in `site.be`: `url`, `token`, `invert` (flip the sign), `soc_url` (battery SoC from a second entity, own poll slot), `dimension` (`"kW"` → ×1000). The per-integration options are documented in the root `CLAUDE.md` (Integrations table).
 
 | Integration | Module | Reads | Switches loads |
 |---|---|---|---|
 | `gplug` | `gplug.be` | a `field` of the local `tasmota.read_sensors()` object `sensor` (default `z`); SunSpec scale factors, `max_power`, `stale_after`, `energy_field`, `soc_field` | no |
 | `homeassistant` | `homeassistant.be` | HA entity state via the HTTP API (bearer `token`); non-numeric states report no value | no (read-only) |
 | `shelly` | `shelly.be` | Shelly Gen1 relay on/off status (`ison`) — `url` is a map `{on, off, status}` | yes (GETs `on`/`off`) |
-| `modbustcp` | `modbustcp.be` | ONE register (pair) over Modbus TCP: `unit`, `function`, `register`, `dtype`, `swap_words`, `scale` | no (read-only) |
+| `modbustcp` | `modbustcp.be` | registers over Modbus TCP, one connection per poll: `unit`, `function`, `register`, `dtype`, `swap_words`, `scale`, plus `soc_register`, `energy_register`, `state_register` (issue #20) | yes (`write` block: FC 6/16, or FC 5 coil) |
 | `simulator` | `simulator.be` | the Spring Boot simulator's REST API | yes |
 
 ### API / Webservice
@@ -111,4 +111,4 @@ Loads have three states: `inactive` (user-deselected), `waiting` (requested but 
 The Makefile minifies Berry sources (`*.be` and `integrations/*.be`, flattened into the `.tapp` root) with `minify.py` (strips `#` comments and indentation; blank lines are kept so line numbers in on-device errors match the source), runs the Vite build in `ems/frontend` (which bakes the versioned CDN URLs into the `index.html` shell) and always runs `bundle.py --lang-only` for the i18n completeness check, then zips everything into `build/ems-v<VERSION>.tapp` (`-<lang>` suffix when `LANG` is set). The `.tapp` is a standard zip with no compression (`-0`). The hashed JS/CSS **and `lang.json`** always stay on GitHub Pages (`gplug-ch/gplug-cdn`) and only the shell is packed (there is no self-host mode).
 
 ### Testing
-`tests/tasmota.be` is a stub for the Tasmota built-in `tasmota` module (unavailable in Berry CLI). Tests that need `webclient` define their own stub at global scope before `import ems`. Test data fixtures are in `tests/site.json` (plus `tests/netgate/`, `tests/battery/` and `tests/modbus/` — each has its own `site.json` and compiles the REAL `site.be` by path, since `tests/site.be` is a stub that shadows it; `tests/battery/` covers the `soc_url` sentinel and `invert`, `tests/modbus/` the `modbusRegisters` polling). `make test-backend` runs `tests/test_*.be` with `berry -m ..` and `tests/*/test_*.be` with `berry -m ../..`.
+`tests/tasmota.be` is a stub for the Tasmota built-in `tasmota` module (unavailable in Berry CLI). Tests that need `webclient` define their own stub at global scope before `import ems`. Test data fixtures are in `tests/site.json` (plus `tests/netgate/`, `tests/battery/` and `tests/modbus/` — each has its own `site.json` and compiles the REAL `site.be` by path, since `tests/site.be` is a stub that shadows it; `tests/battery/` covers the `soc_url` sentinel and `invert`, `tests/modbus/` the `modbusRegisters` polling, `tests/modbus_write/` FC 5/6/16 framing, write/read round-trips, extra registers and load switching through `site.be`). `make test-backend` runs `tests/test_*.be` with `berry -m ..` and `tests/*/test_*.be` with `berry -m ../..`.

@@ -33,6 +33,14 @@ test('examples/site-1.json validates (backend test 7 parity)', () => {
   assert.deepStrictEqual(validateDocument(JSON.parse(readFileSync(p, 'utf8'))), []);
 });
 
+/* issue #20: every item type over Modbus, incl. switched loads */
+['site-modbus-all.json', 'site-sim-modbus.json'].forEach(function (name) {
+  test('examples/' + name + ' validates', () => {
+    const p = fileURLToPath(new URL('../../backend/examples/' + name, import.meta.url));
+    assert.deepStrictEqual(validateDocument(JSON.parse(readFileSync(p, 'utf8'))), []);
+  });
+});
+
 /* ---------- structure (backend test 1 + 3 parity) ---------- */
 
 test('non-object document', () => {
@@ -303,4 +311,70 @@ test('findings accumulate across the document', () => {
     { path: 'loads[1].id', key: 'settings.err.id_duplicate' },
     { path: 'tariffs.base_fee_chf_month', key: 'settings.err.rate' }
   ]);
+});
+
+/* ---------- modbustcp extras: soc / energy / state / write (issue #20) ---------- */
+
+test('validateLoad: a modbustcp load may use its state register instead of a power register', () => {
+  const load = { id: 'boiler', currentPower: 500, priority: 1, integration: 'modbustcp',
+    url: '10.0.0.1:502', state_register: 1100,
+    write: { register: 1100, dtype: 'uint16', on: 2, off: 1, inactive: 0 } };
+  assert.deepStrictEqual(validateLoad(load, []), {});
+  assert.strictEqual(validateLoad(Object.assign({}, load, { state_register: '' }), []).register,
+    'settings.err.modbus_register');
+});
+
+test('validateLoad: write block needs an integer register and numeric values', () => {
+  const base = { id: 'b', currentPower: 1, priority: 1, integration: 'modbustcp',
+    url: '10.0.0.1:502', register: 1 };
+  const e = validateLoad(Object.assign({}, base, { write: { register: 1.5, on: 'x', off: '' } }), []);
+  assert.strictEqual(e['write.register'], 'settings.err.modbus_register');
+  assert.strictEqual(e['write.on'], 'settings.err.modbus_value');
+  assert.strictEqual(e['write.off'], undefined);
+  /* a blank write register means «not switched»: nothing else is checked */
+  assert.deepStrictEqual(validateLoad(Object.assign({}, base, { write: { register: '', on: 'x' } }), []), {});
+});
+
+test('validateProduction: modbustcp soc/energy registers and scales', () => {
+  const p = { id: 'bat', productionType: 'BATTERY', integration: 'modbustcp',
+    url: '10.0.0.1:502', register: 200, soc_register: -1, soc_scale: 0, energy_register: 'a',
+    energy_dimension: 'MWh' };
+  const e = validateProduction(p, []);
+  assert.strictEqual(e.soc_register, 'settings.err.modbus_register');
+  assert.strictEqual(e.soc_scale, 'settings.err.modbus_scale');
+  assert.strictEqual(e.energy_register, 'settings.err.modbus_register');
+  assert.strictEqual(e.energy_dimension, 'settings.err.energy_dimension');
+});
+
+test('validateDocument: modbustcp state-only load passes, bad write register is flagged', () => {
+  const c = valid();
+  c.loads = [
+    { id: 'l1', integration: 'modbustcp', url: '10.0.0.1:502', state_register: 1100 },
+    { id: 'l2', integration: 'modbustcp', url: '10.0.0.1:502', register: 1, write: { register: -1 } }
+  ];
+  assert.deepStrictEqual(validateDocument(c), [
+    { path: 'loads[1].write.register', key: 'settings.err.modbus_register' }
+  ]);
+});
+
+test('dropBlankModbusKeys: extra registers and the write block', () => {
+  const l = dropBlankModbusKeys({ id: 'b', integration: 'modbustcp', url: '10.0.0.1:502',
+    register: '', state_register: '1100', energy_register: '',
+    write: { register: '1100', dtype: 'uint16', on: '2', off: '1', inactive: '', function: '' } });
+  assert.strictEqual('register' in l, false);
+  assert.strictEqual(l.state_register, 1100);
+  assert.strictEqual('energy_register' in l, false);
+  assert.deepStrictEqual(l.write, { register: 1100, dtype: 'uint16', on: 2, off: 1 });
+
+  const noWrite = dropBlankModbusKeys({ id: 'b', integration: 'modbustcp', url: '10.0.0.1:502',
+    register: 1, write: { register: '', on: '1' } });
+  assert.strictEqual('write' in noWrite, false);
+
+  const pv = dropBlankModbusKeys({ id: 'pv', productionType: 'PHOTOVOLTAIC', integration: 'modbustcp',
+    url: '10.0.0.1:502', register: 1, soc_register: '5', energy_register: '120', energy_scale: '0.01',
+    energy_dimension: '' });
+  assert.strictEqual('soc_register' in pv, false);
+  assert.strictEqual(pv.energy_register, 120);
+  assert.strictEqual(pv.energy_scale, 0.01);
+  assert.strictEqual('energy_dimension' in pv, false);
 });

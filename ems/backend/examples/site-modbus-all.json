@@ -1,0 +1,87 @@
+{
+  "id": "site-1",
+  "name": "Site 1",
+  "location": "Bahnhofstrasse 77, Bern",
+  "description": "Every item type over Modbus TCP (issue #20): PV with energy counter, battery with SoC, grid as ONE signed register (+ import / - export, id 'from' alone; a from/to pair of unsigned registers works too), a load read by its state register and switched by a holding-register write, and a relay load switched via a coil",
+  "productions": [
+    {
+      "id": "pv-1",
+      "friendlyName": "PV Wechselrichter",
+      "productionType": "PHOTOVOLTAIC",
+      "integration": "modbustcp",
+      "url": "192.168.0.150:502",
+      "unit": 1,
+      "function": 4,
+      "register": 106,
+      "dtype": "float32",
+      "energy_register": 120,
+      "energy_dtype": "uint32",
+      "energy_dimension": "kWh",
+      "energy_scale": 0.01,
+      "max_power": 12000
+    },
+    {
+      "id": "battery-1",
+      "friendlyName": "Batterie",
+      "productionType": "BATTERY",
+      "integration": "modbustcp",
+      "url": "192.168.0.151:502",
+      "unit": 1,
+      "function": 4,
+      "register": 200,
+      "dtype": "int16",
+      "soc_register": 201,
+      "soc_dtype": "uint16",
+      "soc_scale": 0.1,
+      "capacity": 10000,
+      "maxChargePower": 5000,
+      "maxDischargePower": 5000
+    }
+  ],
+  "grid": [
+    {
+      "id": "from",
+      "dimension": "W",
+      "integration": "modbustcp",
+      "url": "192.168.0.152:502",
+      "unit": 1,
+      "function": 4,
+      "register": 300,
+      "dtype": "int32"
+    }
+  ],
+  "loads": [
+    {
+      "id": "boiler-1",
+      "friendlyName": "Boiler",
+      "loadType": "ELECTRICITY",
+      "priority": 1,
+      "currentPower": 2000,
+      "minimalDuration": 600,
+      "integration": "modbustcp",
+      "url": "192.168.0.153:502",
+      "unit": 1,
+      "state_register": 1100,
+      "write": { "register": 1100, "dtype": "uint16", "on": 1, "off": 0 }
+    },
+    {
+      "id": "heatpump-1",
+      "friendlyName": "Wärmepumpe (SG-Ready Relais)",
+      "loadType": "ELECTRICITY",
+      "priority": 2,
+      "currentPower": 1500,
+      "integration": "modbustcp",
+      "url": "192.168.0.154:502",
+      "unit": 1,
+      "function": 3,
+      "register": 10,
+      "dtype": "float32",
+      "write": { "register": 0, "function": 5, "on": 1, "off": 0 }
+    }
+  ],
+  "tariffs": {
+    "grid_import_chf_kwh": 0.26,
+    "grid_feedin_chf_kwh": 0.18,
+    "base_fee_chf_month": 12.5
+  }
+}
