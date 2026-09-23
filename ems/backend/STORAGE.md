@@ -136,21 +136,21 @@ longer written (a line is ≈ 18.8 B instead of ≈ 26.8 B) and the `/e1d` + `/e
 
 | Item | Size (bytes) | Basis |
 |---|---:|---|
-| `.tapp` (app + UI shell) | **131 072** (128 KB budget) | measured **58 682 B** today (v0.1.0, CDN build — `lang.json` and the JS bundle are not packed); budgeted 128 KB to absorb future Berry growth. There is no self-host build; the JS/CSS bundle always comes from the CDN |
+| `.tapp` (app + UI shell) | **131 072** (128 KB budget) | measured **71 817 B** today (v0.1.3, CDN build — `lang.json` and the JS bundle are not packed); budgeted 128 KB to absorb future Berry growth. There is no self-host build; the JS/CSS bundle always comes from the CDN |
 | `store.be` bucket files | **85 920** | worst case: battery site, all 30 days full (§ above; 54 240 without a battery) |
-| `site.json` | **2 708** | largest bundled example (`examples/site-ha.json`) |
+| `site.json` | **3 720** | largest bundled example (`examples/site-sim-modbus.json`) |
 | `lang.json` (runtime language file) | **0** (CDN) | always served from GitHub Pages, never packed |
-| **Total** | **219 700** | 131 072 + 85 920 + 2 708 |
+| **Total** | **220 712** | 131 072 + 85 920 + 3 720 |
 
 ```
 Partition                : 327 680 B  (320 KB)
-Persistent footprint     : 219 700 B  (≈ 215 KB)
+Persistent footprint     : 220 712 B  (≈ 216 KB)
 --------------------------------------------------
-Remaining headroom       : 107 980 B  (≈ 105 KB, 33 % free)
+Remaining headroom       : 106 968 B  (≈ 104 KB, 33 % free)
 ```
 
-Using the measured `.tapp` (58 682 B, v0.1.0) instead of the 128 KB growth budget leaves
-180 370 B ≈ 176 KB free (212 050 B ≈ 207 KB on a site without a battery). Either way the device stays well inside budget with the ≥ 40 KB margin spec 011
+Using the measured `.tapp` (71 817 B, v0.1.3) instead of the 128 KB growth budget leaves
+166 223 B ≈ 162 KB free (197 903 B ≈ 193 KB on a site without a battery). Either way the device stays well inside budget with the ≥ 40 KB margin spec 011
 FR-1124 requires.
 
 ### `.tapp` size history (NFR-1101)
@@ -161,10 +161,11 @@ FR-1124 requires.
 | v1.0.11 (step 2, validation → browser) | 85 247 B | — | −3 391 B |
 | v1.0.12 (step 3a, browser archive) | 85 347 B | 88 479 B | — |
 | v1.0.13 (step 3b) | 71 704 B | 74 836 B | −13 643 B |
-| **v0.1.0 (current; version numbering restarted with this repository)** | **55 297 B** (minified Berry) | **58 682 B** | **−16 154 B** (issue #1 energy-community removal, issue #9, plus `modbustcp`/battery additions) |
+| v0.1.0 (version numbering restarted with this repository) | 55 297 B (minified Berry) | 58 682 B | −16 154 B (issue #1 energy-community removal, issue #9, plus `modbustcp`/battery additions) |
+| **v0.1.3 (current)** | **68 272 B** (minified Berry) | **71 817 B** | **+13 135 B** (issue #20: `modbustcp` for every item type + load switching, `modbusservice.be` manual register read/write) |
 
 With step 3b `store.be` went 15 334 → 5 323 B minified (5 099 B today). Against the v1.0.9 baseline
-the `.tapp` is **35 859 B smaller**, past the ≥ 15 KB NFR-1101 requires.
+the `.tapp` is **22 724 B smaller**, past the ≥ 15 KB NFR-1101 requires.
 
 ### Notes on the budget
 
@@ -173,7 +174,7 @@ the `.tapp` is **35 859 B smaller**, past the ≥ 15 KB NFR-1101 requires.
 - **No migration (issue #4 / spec 011 step 3b / issue #1):** the pre-bucket `/energy.json`, the `/e1d` + `/e1mo` seal files, any stray `.tmp` and the former energy-community files (`/vzev.json`, `.vz_<id>_<dayno>` peer buckets) are removed at boot (`store._remove_obsolete()`) the first time this
   firmware runs — history from before the upgrade lives in the browser archive, not on the device.
 - The largest single lever remaining is the `.tapp` itself; the 128 KB budget now reserves
-  ~71 KB over the measured build. The follow-ups spec 011 listed as out of scope (e.g.
+  ~58 KB over the measured build. The follow-ups spec 011 listed as out of scope (e.g.
   de-duplicating the bucket helpers into `fsx.be`) landed with issue #9 (−1.4 KB minified
   Berry); the energy-community removal (issue #1) dropped the community module and its UDP transport.
 
