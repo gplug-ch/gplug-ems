@@ -205,7 +205,8 @@ var PAGE_SIZES = [10, 25, 50];
     var chartMode = modeSt[0], setChartMode = modeSt[1];
 
     var dataSt = useState({ records: null, tariffs: {}, producer: false,
-                            err: false, archived: false, coverage: null });
+                            err: false, archived: false, coverage: null,
+                            blocked: false });
     var data = dataSt[0], setData = dataSt[1];
     var loadSt = useState(true);
     var loading = loadSt[0], setLoading = loadSt[1];
@@ -241,7 +242,8 @@ var PAGE_SIZES = [10, 25, 50];
           var prods = res[2];
           if (energy === null) {
             setData({ records: null, tariffs: {}, producer: false,
-                      err: true, archived: false, coverage: null });
+                      err: true, archived: false, coverage: null,
+                      blocked: st.available === false });
             setLoading(false);
             return;
           }
@@ -251,7 +253,8 @@ var PAGE_SIZES = [10, 25, 50];
           });
           setData({ records: energy, tariffs: tariffs, producer: producer,
                     err: false, archived: useArchive,
-                    coverage: st.coverage || null });
+                    coverage: st.coverage || null,
+                    blocked: st.available === false });
           setLoading(false);
         });
       });
@@ -364,6 +367,9 @@ var PAGE_SIZES = [10, 25, 50];
       <div>
         <${ui.PageHeader} title=${t('page.history')} subtitle=${t('history.subtitle')}
           actions=${actions} />
+
+        ${data.blocked ? html`
+          <div class="banner banner-warn">${t('banner.archive', { days: DEV_CAP / 96 })}</div>` : null}
 
         ${data.archived ? html`<${ArchiveNote} coverage=${data.coverage}
           span=${ARCHIVE_SPAN[resKey]} />` : null}

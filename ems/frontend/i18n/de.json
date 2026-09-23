@@ -376,7 +376,7 @@
   "settings.err.array_required": "Muss ein Array von Objekten sein.",
   "history.col.gridcost_ht": "Netzbezug HT Kosten",
   "history.col.gridcost_nt": "Netzbezug NT Kosten",
-  "banner.archive": "Archiv nicht verfügbar — es sind nur die letzten Tage sichtbar, die das Gerät noch speichert.",
+  "banner.archive": "Archiv nicht verfügbar: Dieser Browser speichert keine Daten (z. B. privates Fenster oder gesperrter Website-Speicher). Sichtbar sind nur die letzten {days} Tage, die das Gerät selbst vorhält. Für den vollen Verlauf ein normales Fenster verwenden bzw. Website-Daten für diese Seite erlauben.",
   "banner.archive_site_changed": "Dieses Gerät meldet die Site-ID «{id}». Für andere IDs bleibt ein eigenes Archiv bestehen.",
   "history.archive_badge": "Archiv: {days} Tage",
   "history.archive_gap": "provisorisch — Lücke im Archiv ({from} – {to}, {count} Bereiche)",

@@ -376,7 +376,7 @@
   "settings.err.array_required": "Must be an array of objects.",
   "history.col.gridcost_ht": "Grid import peak cost",
   "history.col.gridcost_nt": "Grid import off-peak cost",
-  "banner.archive": "Archive unavailable — only the last days the device still keeps are visible.",
+  "banner.archive": "Archive unavailable: this browser does not store data (a private window, or site storage blocked). Only the last {days} days the device itself keeps are visible. For the full history use a normal window or allow site data for this page.",
   "banner.archive_site_changed": "This device reports site id «{id}». Archives of other ids are kept separately.",
   "history.archive_badge": "Archive: {days} days",
   "history.archive_gap": "provisional — gap in the archive ({from} – {to}, {count} ranges)",

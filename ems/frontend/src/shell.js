@@ -111,8 +111,6 @@ import * as archive from './lib/archive.js';
     var showMeter = meterSt[0], setShowMeter = meterSt[1];
     var modbusSt = useState(false);
     var showModbus = modbusSt[0], setShowModbus = modbusSt[1];
-    var archSt = useState(false);
-    var archBlocked = archSt[0], setArchBlocked = archSt[1];
 
     /* offline toast + stale note (edge cases) */
     useEffect(function () {
@@ -126,13 +124,12 @@ import * as archive from './lib/archive.js';
       });
     }, []);
 
-    /* spec 011 FR-1111: storage blocked (private window, quota, SecurityError)
-       -> every page still renders from the live device buffer, but the user is
-       told that only the last few days are visible. */
+    /* The FR-1111 «archive unavailable» banner lives on Verlauf, the only page
+       whose content it changes (issue #11); the Einstellungen «Daten» tab has
+       its own note. */
     useEffect(function () {
       var warned = false;
       function apply(st) {
-        setArchBlocked(st.available === false);
         /* FR-1102: a second site id under this origin (device renamed or
            replaced) keeps its own archive — say it once, don't merge them. */
         if (!warned && st.otherSites && st.otherSites.length) {
@@ -198,7 +195,6 @@ import * as archive from './lib/archive.js';
 
         <main class="content">
           ${rtcUnsynced ? html`<div class="banner banner-warn">${t('banner.rtc')}</div>` : null}
-          ${archBlocked ? html`<div class="banner banner-warn">${t('banner.archive')}</div>` : null}
           ${staleSince ? html`
             <div class="stale-note">${t('common.stale', {
               time: fmt.time(Math.floor(staleSince.getTime() / 1000), 'hm')

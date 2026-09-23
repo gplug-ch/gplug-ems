@@ -83,7 +83,9 @@ read `archive.range()`; `verlauf.js` derives every
 resolution from 15-min records (the device's `res=1d|1mo` rings are gone as of
 spec 011 step 3b — `/api/energy` answers 400 for anything but `15m`). If IndexedDB is unavailable, every page falls
 back to the live device buffer — which now reaches back 30 days, not 18 months —
-and the shell shows the `banner.archive` warning. Coverage, gaps and CSV export/import live in
+and Verlauf (the only page whose content changes) shows the `banner.archive`
+warning — only when storage is really blocked, not when `/site` lacks an `id`
+(issue #11). Coverage, gaps and CSV export/import live in
 the Einstellungen «Daten» tab.
 
 The `live` store (DB v2) is the one non-archival use: the device serves a
