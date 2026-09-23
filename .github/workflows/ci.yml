@@ -10,7 +10,9 @@ jobs:
     name: make test
     runs-on: ubuntu-latest
     env:
-      BERRY_VERSION: v1.1.0
+      # The v1.1.0 tag predates the CLI's -m (module path) option the tests
+      # use, so pin a master commit instead.
+      BERRY_REF: 66d2d0f94c5487276ca59f9bd7e391d05f33754c
     steps:
       - uses: actions/checkout@v4
 
@@ -21,19 +23,21 @@ jobs:
           cache-dependency-path: ems/frontend/package-lock.json
 
       # The Berry CLI runs the backend tests; it has no release binaries, so
-      # build it from the tagged source once and cache the result.
+      # build it from source once and cache the result.
       - name: Cache Berry CLI
         id: berry-cache
         uses: actions/cache@v4
         with:
           path: ~/berry-bin
-          key: berry-${{ env.BERRY_VERSION }}-${{ runner.os }}
+          key: berry-${{ env.BERRY_REF }}-${{ runner.os }}
 
       - name: Build Berry CLI
         if: steps.berry-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq libreadline-dev
-          git clone --depth 1 --branch "$BERRY_VERSION" https://github.com/berry-lang/berry.git /tmp/berry
+          git init -q /tmp/berry
+          git -C /tmp/berry fetch -q --depth 1 https://github.com/berry-lang/berry.git "$BERRY_REF"
+          git -C /tmp/berry checkout -q FETCH_HEAD
           make -C /tmp/berry
           mkdir -p ~/berry-bin
           cp /tmp/berry/berry ~/berry-bin/
