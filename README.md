@@ -21,7 +21,7 @@ own; no cloud service or server is involved.
 ### 1. Get the `.tapp`
 
 Download **one** file from the
-[latest GitHub Release](https://github.com/jluthiger/gplug-ems/releases/latest):
+[latest GitHub Release](https://github.com/gplug-ch/gplug-ems/releases/latest):
 `ems-v<VERSION>.tapp` (German UI) or `ems-v<VERSION>-en.tapp` (English UI).
 
 Or build it from a checkout (Node.js + npm, Python 3, `make`, `zip`):
