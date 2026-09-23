@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: make test
+    runs-on: ubuntu-latest
+    env:
+      BERRY_VERSION: v1.1.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ems/frontend/package-lock.json
+
+      # The Berry CLI runs the backend tests; it has no release binaries, so
+      # build it from the tagged source once and cache the result.
+      - name: Cache Berry CLI
+        id: berry-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/berry-bin
+          key: berry-${{ env.BERRY_VERSION }}-${{ runner.os }}
+
+      - name: Build Berry CLI
+        if: steps.berry-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$BERRY_VERSION" https://github.com/berry-lang/berry.git /tmp/berry
+          make -C /tmp/berry
+          mkdir -p ~/berry-bin
+          cp /tmp/berry/berry ~/berry-bin/
+
+      - run: echo "$HOME/berry-bin" >> "$GITHUB_PATH"
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: ems/frontend
+
+      - run: make test
