@@ -50,6 +50,7 @@ make                                # build/ems-v<version>.tapp  (CDN shell — 
 make build-self                     # assets + lang.json packed into the .tapp
 make build-dev                      # shell loads the UI from your `make dev` server
 make LANG=en                        # English build -> ems-v<version>-en.tapp
+make build-self LANG=en             # -> ems-v<version>-en-self.tapp
 
 make flash DEVICE=192.168.1.42      # delete stale .tapps, upload, restart
 make flash DEVICE=192.168.1.42 DRYRUN=1
@@ -63,10 +64,27 @@ leaves the previous release in place: both apps boot, the module graph is built
 twice and the boot heap roughly doubles — which on
 an ESP32-C3 is a reboot loop. `deploy.sh` deletes the stale ones first.
 
-Bump `VERSION.txt` before a release; it names the `.tapp` and the CDN asset
-directory. `make release` builds the CDN `.tapp` *and* publishes the matching
-bundle to GitHub Pages (needs push access to `gplug-ch/gplug-cdn`);
-`make deploy-cdn` publishes an already-built bundle only.
+Releases ship prebuilt `.tapp`s on
+[GitHub Releases](https://github.com/jluthiger/gplug-ems/releases). Bump
+`VERSION.txt` before a release; it names the `.tapp`s, the CDN asset directory
+and the tag. From a clean `main` that matches `origin/main`, `make release`:
+
+1. builds the German and English CDN `.tapp`s (both bundles land in
+   `dist/v<version>/`; the English dictionary is `lang-en.json`),
+2. publishes that bundle to GitHub Pages (needs push access to
+   `gplug-ch/gplug-cdn`),
+3. builds the German and English self-host `.tapp`s (`-self` suffix),
+4. creates the GitHub Release `v<version>` on `HEAD` with all four `.tapp`s
+   (collected in `release/`). The notes are `.github/release-notes.md`
+   (downloads + flashing instructions) followed by the merged PRs since the
+   previous release, grouped by label via `.github/release.yml` (`enhancement`,
+   `bug`, `documentation`; `skip-changelog` leaves a PR out).
+
+It refuses to start when `gh` is not logged in, the tree is dirty, `HEAD` is not
+`origin/main`, or the tag `v<version>` already exists (VERSION.txt not bumped).
+`make release DRYRUN=1` builds the four `.tapp`s and the notes into `release/`
+without any of these checks and publishes nothing. `make deploy-cdn` publishes
+an already-built bundle only.
 
 ### On-device configuration
 
@@ -230,14 +248,15 @@ cd ems/frontend && npm run deploy      # scripts/deploy-gh-pages.sh
 ```
 
 The script clones `github.com/gplug-ch/gplug-cdn`, copies `dist/<version>/`
-(JS/CSS + `lang.json`; the `index.html` shell ships in the `.tapp`) into
+(JS/CSS + `lang.json`, plus `lang-<lang>.json` for each non-German build made
+with `KEEP_DIST=1`; the `index.html` shell ships in the `.tapp`) into
 `/<version>/`, commits and pushes. The repo's Pages workflow then publishes it
 at `https://gplug-ch.github.io/gplug-cdn/<version>/…`, matching the URLs baked
 into the shell. Version directories already in the repo are never touched, so
 devices flashed with an older version keep resolving their assets. Needs push
 access to the repo (an authenticated `git`); override the target with
-`CDN_REPO=<url>`. `make deploy-cdn` runs this script; `make release` does the
-`.tapp` build and this deploy in one step.
+`CDN_REPO=<url>`. `make deploy-cdn` runs this script; `make release` runs it
+between the CDN and self-host builds (see [Build and flash](#build-and-flash)).
 
 The old Cloudflare Pages deploy is still available as `npm run
 deploy:cloudflare` (needs `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`).

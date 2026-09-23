@@ -23,12 +23,6 @@ else
 UILANG := de
 endif
 
-# Output file (non-German builds get a -<lang> suffix)
-ifeq ($(UILANG),de)
-TAPP := $(BUILD_DIR)/$(TARGET)-$(VERSION).tapp
-else
-TAPP := $(BUILD_DIR)/$(TARGET)-$(VERSION)-$(UILANG).tapp
-endif
 
 # Berry sources, flattened into the .tapp root (tests live in tests/, not here)
 BERRY_SRC := $(wildcard $(BACKEND_DIR)/*.be $(BACKEND_DIR)/integrations/*.be)
@@ -46,6 +40,16 @@ CDN_BASE_URL   ?= https://gplug-ch.github.io/gplug-cdn
 # empty -> Vite auto-detects this machine's LAN IP (dev shell runs on the device)
 DEV_SERVER_URL ?=
 
+# Output file: non-German builds get a -<lang> suffix, self-host builds a
+# -self suffix, so all release variants can sit side by side:
+#   ems-v1.2.0.tapp  ems-v1.2.0-en.tapp  ems-v1.2.0-self.tapp  ems-v1.2.0-en-self.tapp
+TAPP_SUFFIX := $(if $(filter-out de,$(UILANG)),-$(UILANG))$(if $(filter self,$(ASSET_BASE)),-self)
+TAPP := $(BUILD_DIR)/$(TARGET)-$(VERSION)$(TAPP_SUFFIX).tapp
+
+# `make release` collects the .tapps here (build/ is wiped by every build).
+RELEASE_DIR := release
+GH_REPO_URL := https://github.com/jluthiger/gplug-ems
+
 # Vite output dir carrying the shell we pack (self/dev modes have own subdirs).
 ifeq ($(ASSET_BASE),self)
 FRONTEND_DIST := $(FRONTEND_DIR)/dist/self
@@ -58,7 +62,7 @@ endif
 .DEFAULT_GOAL := build
 .PHONY: build build-self build-dev dev test test-backend test-frontend \
 	release deploy-cdn flash sim-run sim-test sim-ui clean help \
-	minify frontend tapp guard-cdn
+	minify frontend tapp guard-release
 
 # =============================================================================
 # BUILD
@@ -104,7 +108,7 @@ frontend:
 	cd $(FRONTEND_DIR) && npm ci
 	cd $(FRONTEND_DIR) && APP_VERSION=$(VERSION) UILANG=$(UILANG) \
 		ASSET_BASE=$(ASSET_BASE) CDN_BASE_URL=$(CDN_BASE_URL) \
-		DEV_SERVER_URL=$(DEV_SERVER_URL) npm run build
+		DEV_SERVER_URL=$(DEV_SERVER_URL) KEEP_DIST=$(KEEP_DIST) npm run build
 	@if [ "$(ASSET_BASE)" = "self" ]; then \
 		python3 $(FRONTEND_DIR)/bundle.py --lang-only --quiet \
 			--lang $(UILANG) --langout $(BUILD_DIR)/lang.json; \
@@ -153,18 +157,60 @@ test-frontend: ## Run the frontend node tests
 # RELEASE / DEPLOY
 # =============================================================================
 
-guard-cdn:
+# Refuse to release anything that is not exactly origin/main with a fresh
+# version: the tag check doubles as "VERSION.txt was not bumped". DRYRUN=1
+# skips the repo/GitHub checks so the asset build can be tried anywhere.
+guard-release:
 ifneq ($(ASSET_BASE),cdn)
 	$(error make release builds the public CDN release; ASSET_BASE must be "cdn" (got "$(ASSET_BASE)"))
 endif
+ifeq ($(DRYRUN),)
+	@gh auth status >/dev/null 2>&1 || { echo "release: gh is not logged in (run 'gh auth login')"; exit 1; }
+	@test -z "$$(git status --porcelain)" || { echo "release: working tree is not clean"; exit 1; }
+	@test "$$(git rev-parse --abbrev-ref HEAD)" = main || { echo "release: not on branch main"; exit 1; }
+	@git fetch --quiet origin main --tags
+	@test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" || { echo "release: HEAD is not origin/main (pull/push first)"; exit 1; }
+	@! git rev-parse -q --verify "refs/tags/$(VERSION)" >/dev/null || { echo "release: tag $(VERSION) already exists — bump VERSION.txt"; exit 1; }
+	@test -z "$$(git ls-remote --tags origin "refs/tags/$(VERSION)")" || { echo "release: tag $(VERSION) already exists on origin — bump VERSION.txt"; exit 1; }
+endif
 
-# Full production release: build the .tapp with the CDN asset base (bakes
-# $(CDN_BASE_URL)/$(VERSION)/ into index.html) and publish the matching
-# JS/CSS/lang.json bundle to the gplug-cdn repo (GitHub Pages) so that CDN URL
-# resolves. Needs push access to github.com/gplug-ch/gplug-cdn (see
-# ems/README.md).
-release: guard-cdn build ## Build the CDN .tapp and publish its bundle to the CDN
+# Build one .tapp variant (lang, asset base, KEEP_DIST) and collect it.
+release-variant = @"$(MAKE)" build LANG=$(1) ASSET_BASE=$(2) KEEP_DIST=$(3) \
+	&& cp $(BUILD_DIR)/*.tapp $(RELEASE_DIR)/
+
+# Full production release of VERSION.txt:
+#   1. build the German and English CDN .tapps (both into dist/<version>/,
+#      KEEP_DIST=1 keeps the German bundle when the English one is built)
+#   2. publish that bundle to the gplug-cdn repo (GitHub Pages) so the CDN URL
+#      baked into index.html resolves — needs push access to
+#      github.com/gplug-ch/gplug-cdn (see ems/README.md)
+#   3. build the German and English self-host .tapps
+#   4. create the GitHub Release v<version> (gh creates the tag on HEAD) with
+#      all four .tapps; notes = .github/release-notes.md + the PR list that
+#      --generate-notes groups via .github/release.yml
+# Every sub-make names LANG and ASSET_BASE explicitly: a command-line value
+# would otherwise leak into all of them via MAKEFLAGS.
+#   make release            # the real thing
+#   make release DRYRUN=1   # build the assets + notes into release/, publish nothing
+release: guard-release ## Build all .tapps, publish the CDN bundle + GitHub Release (DRYRUN=1)
+	@rm -rf $(RELEASE_DIR) && mkdir -p $(RELEASE_DIR)
+	$(call release-variant,de,cdn,)
+	$(call release-variant,en,cdn,1)
+ifeq ($(DRYRUN),)
 	@"$(MAKE)" deploy-cdn
+else
+	@echo "DRYRUN: skipping CDN deploy"
+endif
+	$(call release-variant,de,self,)
+	$(call release-variant,en,self,)
+	@sed 's/@VERSION@/$(VERSION)/g' .github/release-notes.md > $(RELEASE_DIR)/NOTES.md
+	@ls -l $(RELEASE_DIR)
+	@set -- gh release create "$(VERSION)" $(RELEASE_DIR)/*.tapp \
+		--target "$$(git rev-parse HEAD)" --title "gPlug EMS $(VERSION)" \
+		--notes-file $(RELEASE_DIR)/NOTES.md --generate-notes; \
+	if [ -n "$(DRYRUN)" ]; then echo "DRYRUN: would run: $$*"; \
+	else "$$@" && git fetch --quiet --tags \
+		&& echo "released $(VERSION) -> $(GH_REPO_URL)/releases/tag/$(VERSION)"; fi
 
 deploy-cdn: ## Publish the built frontend bundle (dist/<version>) to the CDN
 	@echo "Publishing frontend assets to CDN ($(CDN_BASE_URL))..."
@@ -204,6 +250,6 @@ clean: ## Remove the build directory
 	@echo "Build directory cleaned"
 
 help: ## List the targets
-	@echo "Usage: make [target] [LANG=en] [ASSET_BASE=cdn|self|dev] [DEVICE=<ip>]"
+	@echo "Usage: make [target] [LANG=en] [ASSET_BASE=cdn|self|dev] [DEVICE=<ip>] [DRYRUN=1]"
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'

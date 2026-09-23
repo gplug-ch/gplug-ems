@@ -85,6 +85,13 @@ function buildLangDict() {
   return merged;
 }
 
+// Dictionary file name. CDN/mirror builds of every language share one
+// dist/<version>/ directory (and one CDN version folder), so a non-German
+// dictionary gets its own name (lang-en.json) instead of overwriting the
+// German lang.json. Self-host and dev keep lang.json: there it is served
+// on-device or by the dev server, one language per build.
+const langFile = uilang === 'de' || isSelf || isDev ? 'lang.json' : `lang-${uilang}.json`;
+
 // Device endpoints proxied in dev (see `server.proxy` below). `/api` covers
 // /api/power|energy|meta|meter|modbus|config; /cm is the Tasmota command
 // endpoint used for Wi-Fi settings and restart.
@@ -97,7 +104,7 @@ export default defineConfig(({ command }) => {
   // Dev does NOT use this — main.js derives the dev-server URL from
   // import.meta.url when import.meta.env.DEV, so the flashed ASSET_BASE=dev
   // shell always loads lang.json from `npm run dev`, never the device.
-  const langUrl = isSelf ? '/fs?name=lang.json' : `${base}lang.json`;
+  const langUrl = isSelf ? '/fs?name=lang.json' : `${base}${langFile}`;
 
   // Ordered fetch list baked into main.js. Only self-host packs lang.json into
   // the .tapp, so only self-host may fall back to the device: in CDN mode that
@@ -142,7 +149,9 @@ export default defineConfig(({ command }) => {
   },
   build: {
     outDir,
-    emptyOutDir: true,
+    // KEEP_DIST=1 adds to dist/<version>/ instead of wiping it: `make release`
+    // builds de then en into the same CDN version directory and deploys both.
+    emptyOutDir: process.env.KEEP_DIST !== '1',
     assetsDir: isSelf ? '.' : 'assets',
     rollupOptions: isSelf
       ? {
@@ -168,7 +177,7 @@ export default defineConfig(({ command }) => {
       generateBundle() {
         this.emitFile({
           type: 'asset',
-          fileName: 'lang.json',
+          fileName: langFile,
           source: JSON.stringify(buildLangDict()),
         });
       },

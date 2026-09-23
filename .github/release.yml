@@ -1,0 +1,19 @@
+# Groups the PR list that `gh release create --generate-notes` (make release)
+# appends to .github/release-notes.md. Label a PR skip-changelog to leave it out.
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: Features
+      labels:
+        - enhancement
+    - title: Fixes
+      labels:
+        - bug
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Other changes
+      labels:
+        - "*"

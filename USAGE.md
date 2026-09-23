@@ -9,7 +9,7 @@ This guide covers how to set up, configure, and run the gPlug Energy Management 
 | Docker + Docker Compose | Running the simulator |
 | Node.js + Yarn | Building the simulator frontend (dev only) |
 | Java 21 + Gradle | Running the simulator locally without Docker (dev only) |
-| Berry CLI + Python 3 | Building the EMS `.tapp` (dev only) |
+| Berry CLI + Python 3 | Building the EMS `.tapp` yourself (dev only — releases ship it prebuilt) |
 | gPlug ESP32 (Tasmota) | Production deployment |
 
 ---
@@ -140,18 +140,33 @@ Key fields:
 
 **Production types:** `PHOTOVOLTAIC`, `BATTERY`
 
-### 2. Build the `.tapp`
+### 2. Get the `.tapp`
 
-```sh
-make   # at the repo root; produces build/ems-v<VERSION>.tapp
-```
+Download it from the [latest GitHub Release](https://github.com/jluthiger/gplug-ems/releases/latest).
+Each release carries four variants — pick one:
+
+| File | Language | UI assets |
+|------|----------|-----------|
+| `ems-v<VERSION>.tapp` | German | loaded from the CDN (default) |
+| `ems-v<VERSION>-en.tapp` | English | loaded from the CDN |
+| `ems-v<VERSION>-self.tapp` | German | packed in — networks without internet access |
+| `ems-v<VERSION>-en-self.tapp` | English | packed in — networks without internet access |
+
+Or build it yourself (repo root): `make` → `build/ems-v<VERSION>.tapp`
+(`make LANG=en`, `make build-self` for the other variants).
 
 ### 3. Deploy to the gPlug device
 
-1. Open the Tasmota web UI at `http://<gplug-ip>/`
-2. Go to **Firmware Upgrade** and upload `build/ems-v<VERSION>.tapp`
-3. After the upload completes, upload your `site.json` via the Tasmota filesystem manager
+1. Open the Tasmota web UI at `http://<gplug-ip>/` → **Tools → Manage File system**
+2. **Delete every existing `ems-*.tapp` first** — Tasmota starts every `.tapp`
+   in the root, so an old one left next to the new one boots both apps and
+   reboot-loops an ESP32-C3
+3. Upload the new `.tapp` and your `site.json` there
 4. Restart the device
+
+From a checkout, `make flash DEVICE=<gplug-ip>` (own build) or
+`ems/backend/deploy.sh <gplug-ip> <file.tapp>` (downloaded release) does steps 1–4
+except the `site.json` upload.
 
 ### 4. Access the EMS frontend
 
@@ -180,6 +195,7 @@ This dashboard shows all loads and productions, their current states, and allows
 | Start simulator (Docker) | `cd simulator/backend && docker compose up --build` |
 | Simulator React frontend | `http://localhost:9090/simulator/` |
 | Simulator Swagger UI | `http://localhost:9090/simulator/swagger-ui.html` |
+| Download EMS `.tapp` | https://github.com/jluthiger/gplug-ems/releases/latest |
 | Build EMS `.tapp` | `make` (repo root) |
 | EMS frontend (on device) | `http://<gplug-ip>/app` |
 | Tasmota admin UI | `http://<gplug-ip>/` |
