@@ -43,7 +43,7 @@ All `make` targets run from the repo root (single root `Makefile`; `make help` l
 
 ### Two runtimes, one domain model
 
-**EMS (production):** Berry scripts packaged as a `.tapp` deployed on Tasmota ESP32 firmware. The device ships only a tiny `index.html` shell; the Vite-built JS/CSS bundle and the `lang.json` dictionary are served from a CDN (GitHub Pages, gplug-ch/gplug-cdn), versioned by `VERSION.txt`. There is no self-host mode: the UI always loads from the CDN, so the browser needs internet access. Each device is standalone: it runs the allocation algorithm for its own site only; there is no inter-device communication.
+**EMS (production):** Berry scripts packaged as a `.tapp` deployed on Tasmota ESP32 firmware. The device ships only a tiny `index.html` shell; the Vite-built JS/CSS bundle and the `lang.json` dictionary are served from a CDN (GitHub Pages, gplug-ch/gplug-cdn) under `https://gplug-ch.github.io/gplug-cdn/v<VERSION>/`, versioned by `VERSION.txt`; every version must be published there (`make release` / `make deploy-cdn`) before a device runs it, or its UI stays blank. There is no self-host mode: the UI always loads from the CDN (or an `ASSET_BASE=<url>` mirror), so the browser needs internet access. Canonical description: root `README.md` → «The web UI is served from a CDN (gplug-cdn)». Each device is standalone: it runs the allocation algorithm for its own site only; there is no inter-device communication.
 
 **Simulator:** Spring Boot backend + React frontend running on a PC/server. Mirrors the EMS domain model for testing and demonstration without physical devices.
 

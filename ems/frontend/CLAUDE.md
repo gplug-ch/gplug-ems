@@ -118,5 +118,5 @@ nothing rather than to a stale line.
 **Production object fields:** the site.json config (`id`, `friendlyName`, `productionType` `PHOTOVOLTAIC`/`BATTERY`, `integration`, …) plus live `currentPower` (W; the UI also accepts `current_power`); a battery adds `soc`, a gplug item with `stale_after` adds `stale`/`lastUpdate`, one with `energy_field` adds `energyCounter`.
 
 **Build note:** `make` (repo root) runs the Vite build and packs the shell
-into the `.tapp`. The shell references `<CDN_BASE_URL>/<version>/…`; there is
+into the `.tapp`. The shell references `<CDN_BASE_URL>/v<version>/…` (that version must be published to gplug-cdn — see the root README's CDN section); there is
 no self-host mode (`ASSET_BASE=self` was removed and now fails the build). Don't hand-edit `index.html` asset refs — Vite owns them.

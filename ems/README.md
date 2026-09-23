@@ -2,8 +2,10 @@
 
 The EMS is the part that runs on the gPlug: a **Tasmota Berry backend**
 (`backend/`) packaged as a `.tapp`, and a **Preact + htm frontend**
-(`frontend/`) whose bundle is normally served from a CDN and only reaches the
-device as a small `index.html` shell.
+(`frontend/`) whose bundle is served from the **gplug-cdn** CDN and only
+reaches the device as a small `index.html` shell. **Every version must be
+published to the CDN before a device runs it** — see
+[The web UI is served from a CDN](../README.md#the-web-ui-is-served-from-a-cdn-gplug-cdn).
 
 The two halves have a clear split (see the
 [architecture doc](../docs/architecture.md#where-computation-happens)): the device runs the
@@ -69,8 +71,9 @@ and the tag. From a clean `main` that matches `origin/main`, `make release`:
 
 1. builds the German and English CDN `.tapp`s (both bundles land in
    `dist/v<version>/`; the English dictionary is `lang-en.json`),
-2. publishes that bundle to GitHub Pages (needs push access to
-   `gplug-ch/gplug-cdn`),
+2. publishes that bundle to the
+   [CDN](../README.md#the-web-ui-is-served-from-a-cdn-gplug-cdn) (needs push
+   access to `gplug-ch/gplug-cdn`),
 3. creates the GitHub Release `v<version>` on `HEAD` with both `.tapp`s
    (collected in `release/`). The notes are `.github/release-notes.md`
    (downloads + flashing instructions) followed by the merged PRs since the
@@ -113,9 +116,9 @@ f-strings are evaluated eagerly in Berry, so hot paths guard their logging with
 ## Frontend development
 
 Preact + htm single-page app, built with **Vite**. The hashed JS/CSS bundle and
-the compiled `lang.json` dictionary are served from a CDN (GitHub Pages) so the
-`.tapp` only ships a tiny `index.html` shell. There is no self-hosted mode:
-the browser needs internet access to load the UI.
+the compiled `lang.json` dictionary are served from the
+[CDN](../README.md#the-web-ui-is-served-from-a-cdn-gplug-cdn), so the `.tapp`
+only ships a tiny `index.html` shell and the browser needs internet access.
 
 ```bash
 cd ems/frontend
@@ -219,16 +222,20 @@ really need it, rebuild the firmware with `USE_CORS`. Otherwise use A or B.
 
 ## Frontend build & CDN deploy
 
+What the CDN serves, its URL scheme and the release rule are in the
+[root README](../README.md#the-web-ui-is-served-from-a-cdn-gplug-cdn); this
+section covers the mechanics.
+
 The **asset base** decides where the shipped `index.html` loads its JS/CSS from:
 
 | Mode | Command | index.html references |
 |------|---------|-----------------------|
-| CDN (default) | `npm run build` | `<CDN_BASE_URL>/<version>/assets/…` (default `https://gplug-ch.github.io/gplug-cdn`) |
+| CDN (default) | `npm run build` | `<CDN_BASE_URL>/v<version>/assets/…` (default `https://gplug-ch.github.io/gplug-cdn`) |
 | Dev server | `npm run build:dev` | `<DEV_SERVER_URL>/src/entry.js` + HMR client |
-| Internal mirror | `ASSET_BASE=https://host npm run build` | `https://host/<version>/assets/…` |
+| Internal mirror | `ASSET_BASE=https://host npm run build` | `https://host/v<version>/assets/…` |
 
-The version comes from the repo-root `VERSION.txt` (or `APP_VERSION`). Output is
-nested under the version in `dist/<version>/` (or `dist/dev/`), so
+The version is `v` + the repo-root `VERSION.txt` (or `APP_VERSION`). Output is
+nested under it in `dist/v<version>/` (or `dist/dev/`), so
 the deployed paths match the base baked into the shell.
 
 Normally you do not call these directly — the root Makefile drives the Vite
@@ -242,13 +249,14 @@ Deploy the CDN bundle to GitHub Pages (the `gplug-ch/gplug-cdn` repo):
 cd ems/frontend && npm run deploy      # scripts/deploy-gh-pages.sh
 ```
 
-The script clones `github.com/gplug-ch/gplug-cdn`, copies `dist/<version>/`
+The script clones `github.com/gplug-ch/gplug-cdn`, copies `dist/v<version>/`
 (JS/CSS + `lang.json`, plus `lang-<lang>.json` for each non-German build made
 with `KEEP_DIST=1`; the `index.html` shell ships in the `.tapp`) into
-`/<version>/`, commits and pushes. The repo's Pages workflow then publishes it
-at `https://gplug-ch.github.io/gplug-cdn/<version>/…`, matching the URLs baked
-into the shell. Version directories already in the repo are never touched, so
-devices flashed with an older version keep resolving their assets. Needs push
+`/v<version>/`, commits and pushes. The repo's Pages workflow then publishes it
+at `https://gplug-ch.github.io/gplug-cdn/v<version>/…`, matching the URLs baked
+into the shell. Other version directories are never touched, so devices flashed
+with an older version keep resolving their assets; re-deploying the same
+version replaces that directory. Needs push
 access to the repo (an authenticated `git`); override the target with
 `CDN_REPO=<url>`. `make deploy-cdn` runs this script; `make release` runs it
 after the de and en builds (see [Build and flash](#build-and-flash)).
