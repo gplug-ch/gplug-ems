@@ -34,7 +34,6 @@ var _s = {
     'productions': [],
     'site': nil,
     'grid': [],
-    'grid_config': [],
     'tariffs': {},
     # --- outbound-HTTP scheduler (NFR: single Berry heap on ESP32-C3) --------
     # Every outbound webclient() call (integration read AND relay write) is the
@@ -64,7 +63,8 @@ var _s = {
     # the poll scheduler merges "currentPower" into it in place. Served
     # verbatim by GET /api/modbus for the browser's raw-register view
     # (mirrors GET /api/meter's device-serves-raw / browser-labels split).
-    'modbus_config': [],
+    # Only the copies are kept, not the parsed config lists as well: holding
+    # both doubled every grid/Modbus item on the heap (issue #27).
     'modbus': []
 }
 
@@ -138,6 +138,12 @@ def register_integration(name, mod)
     if name != nil && mod != nil
         _integrations[name] = mod
     end
+end
+
+# the module registered for `name`, or nil — never imports (issue #27: the
+# manual Modbus read must not pull modbustcp into the import cache for good)
+def registered_integration(name)
+    return _integrations.find(name, nil)
 end
 
 # --- config ---
@@ -362,7 +368,6 @@ def load_config()
         }
         _s['loads'] = _fetch_items(config.find("loads", []), "Load")
         _s['productions'] = _fetch_items(config.find("productions", []), "Production")
-        _s['grid_config'] = config.find("grid", [])
         _s['tariffs'] = config.find("tariffs", {})
         # optional dev meter source (see 'meter_cfg' declaration); reset the
         # cache so a reload cannot serve a stale descriptor
@@ -371,17 +376,16 @@ def load_config()
         # persistent grid item maps (copies of config, no fetch); the poll
         # scheduler fills their live values in place a tick at a time
         var grid = []
-        for cfg: _s['grid_config']
+        for cfg: config.find("grid", [])
             var item = {}
             for k: cfg.keys() item[k] = cfg[k] end
             grid.push(item)
         end
         _s['grid'] = grid
         # same copy-then-poll-fills-in-place pattern for standalone Modbus
-        # registers (see 'modbus_config'/'modbus' declaration above)
-        _s['modbus_config'] = config.find("modbusRegisters", [])
+        # registers (see the 'modbus' declaration above)
         var modbus = []
-        for cfg: _s['modbus_config']
+        for cfg: config.find("modbusRegisters", [])
             var item = {}
             for k: cfg.keys() item[k] = cfg[k] end
             modbus.push(item)
@@ -474,6 +478,7 @@ site.STATE_ACTIVE   = STATE_ACTIVE
 
 site.load_config           = load_config
 site.register_integration  = register_integration
+site.registered_integration = registered_integration
 site.get_tariffs           = get_tariffs
 site.get_loads             = get_loads
 site.get_loads_cached      = get_loads_cached

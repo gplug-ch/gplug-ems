@@ -8,6 +8,7 @@ import ems
 import store
 import meter
 import drivershim
+import fsx
 
 # --- integration modules: configured types only (startup-heap issue #2) -----
 # site.be no longer imports all four statically. The imports MUST happen HERE,
@@ -71,35 +72,47 @@ _load_integrations = def ()
     end
 end
 _load_integrations()
-# NOTE: no top-level `import configservice` (~9 KB resident, only loaded on
-# the first POST /api/config — the GET is served as a plain file stream by the
-# stub).
+# NOTE: no top-level `import configservice` / `import modbusservice`: both
+# are compiled per request and dropped (see _transient_call below).
 
-# --- lazy configservice (startup-heap issue #2) -----------------------------
-# configservice costs ~9 KB resident but is only exercised from the settings
-# page. GET /api/config streams site.json verbatim (FR-603) — the stub does
-# that with a plain file read, no module needed. The module (validation +
-# atomic write + rollback) is imported on the FIRST POST and owns the routes
-# from then on; the stub keeps delegating for its already-registered handlers.
-_config_loaded = false
-_config_stub_driver = nil
-
-_config_start = def ()
-    import configservice
-    configservice.start()
-    _config_loaded = true
-    if _config_stub_driver != nil
-        tasmota.remove_driver(_config_stub_driver)
-        _config_stub_driver = nil
+# --- transient request services (issue #27, startup-heap issue #2) ----------
+# configservice (~9 KB) and modbusservice (+ modbustcp when no item uses it)
+# only serve the Einstellungen page. They used to be `import`ed lazily on the
+# first request — but Berry never evicts a module from its import cache, so
+# that only DEFERRED the cost: after one save or one manual Modbus read the
+# bytecode stayed resident until the next restart. Now each request compiles
+# the module afresh (fsx.load_transient), calls one handler and drops it; a
+# gc() afterwards returns the heap to where it was. The compile is the same
+# transient peak the first import used to pay, once per user click.
+#
+# An uncaught exception in a handler drops the socket with no response at all
+# (browser: ERR_EMPTY_RESPONSE / "Failed to fetch", issue #11) — answer 500
+# with the error so the failure names itself in the UI.
+_transient_call = def (name, handler)
+    var before = tasmota.gc()
+    try
+        import introspect
+        var mod = fsx.load_transient(name)
+        introspect.get(mod, handler)()
+        mod = nil
+    except .. as e, msg
+        logger.logMsg(logger.lWarn, f"{name}: {handler} failed: {e} {msg}")
+        import webserver
+        import json
+        webserver.content_open(500, 'application/json')
+        webserver.content_send(json.dump({'error': f"{e} {msg}"}))
+        webserver.content_close()
     end
+    var after = tasmota.gc()
+    logger.logMsg(logger.lDebug, f"{name}: {handler} heap {before} -> {after}")
 end
 
+# GET /api/config streams site.json verbatim (FR-603) with a plain file read,
+# no module needed; only POST (validation + write + rollback) compiles
+# configservice.
+_config_stub_driver = nil
+
 _config_stub_get = def ()
-    if _config_loaded
-        import configservice
-        configservice.getrequest()
-        return
-    end
     import webserver
     try
         # same path configservice._s['file'] uses (see its INVARIANT comment)
@@ -116,53 +129,27 @@ _config_stub_get = def ()
     end
 end
 
-_config_stub_post = def ()
-    # an uncaught exception here drops the socket with no response at all
-    # (browser: ERR_EMPTY_RESPONSE / "Failed to fetch", issue #11) — answer
-    # 500 with the error so the next failure names itself in the UI
-    try
-        if !_config_loaded
-            _config_start()
-        end
-        import configservice
-        configservice.postrequest()
-    except .. as e, m
-        logger.logMsg(logger.lWarn, f"ConfigService: POST failed: {e} {m}")
-        import webserver
-        import json
-        webserver.content_open(500, 'application/json')
-        webserver.content_send(json.dump({'error': f"{e} {m}"}))
-        webserver.content_close()
-    end
-end
-
 _config_stub_web = def ()
     try
         import webserver
-        webserver.on('/api/config', /-> _config_stub_get(),  webserver.HTTP_GET)
-        webserver.on('/api/config', /-> _config_stub_post(), webserver.HTTP_POST)
+        webserver.on('/api/config', /-> _config_stub_get(), webserver.HTTP_GET)
+        webserver.on('/api/config', /-> _transient_call('configservice', 'postrequest'),
+                     webserver.HTTP_POST)
     except ..
     end
 end
 
-# --- lazy modbusservice (issue #20) ------------------------------------------
-# Manual Modbus register read/write for the Einstellungen test panel. Only
-# the two routes live here; the module (and modbustcp, if no item uses it) is
-# imported on the first request, so no bytecode sits in RAM until someone
-# opens the panel. The driver re-registers the routes on a web restart.
+# Manual Modbus register read/write for the Einstellungen test panel (issue
+# #20). The driver re-registers the routes on a web restart.
 _modbus_stub_driver = nil
 
 _modbus_stub_web = def ()
     try
         import webserver
-        webserver.on('/api/modbus/read', def ()
-            import modbusservice
-            modbusservice.readrequest()
-        end, webserver.HTTP_GET)
-        webserver.on('/api/modbus/write', def ()
-            import modbusservice
-            modbusservice.writerequest()
-        end, webserver.HTTP_POST)
+        webserver.on('/api/modbus/read', /-> _transient_call('modbusservice', 'readrequest'),
+                     webserver.HTTP_GET)
+        webserver.on('/api/modbus/write', /-> _transient_call('modbusservice', 'writerequest'),
+                     webserver.HTTP_POST)
     except ..
     end
 end
@@ -210,17 +197,17 @@ start_services = def(net_up)
     # Start file service
     _stage("webservice", /-> webservice.start())
 
-    # Config service (GET/POST /api/config, spec 006) — LAZY (issue #2):
-    # the stub streams site.json on GET and imports the real module on the
-    # first POST; no configservice bytecode in RAM until someone saves.
+    # Config service (GET/POST /api/config, spec 006) — TRANSIENT (issue
+    # #27): the stub streams site.json on GET and compiles configservice for
+    # each POST only; its bytecode is never resident.
     _stage("configservice stub", def()
         _config_stub_driver = drivershim.make({'web_add_handler': _config_stub_web})
         tasmota.add_driver(_config_stub_driver)
         _config_stub_web()
-        logger.logMsg(logger.lInfo, "ConfigService stub on /api/config (module loads on first POST)")
+        logger.logMsg(logger.lInfo, "ConfigService stub on /api/config (module compiled per POST)")
     end)
 
-    # Manual Modbus read/write (issue #20) — LAZY like configservice
+    # Manual Modbus read/write (issue #20) — TRANSIENT like configservice
     _stage("modbusservice stub", def()
         _modbus_stub_driver = drivershim.make({'web_add_handler': _modbus_stub_web})
         tasmota.add_driver(_modbus_stub_driver)
@@ -252,11 +239,6 @@ stop_services = def()
     # Stop file service
     webservice.stop()
 
-    # Stop config service — only if the lazy stub ever loaded it
-    if _config_loaded
-        import configservice
-        configservice.stop()
-    end
     if _config_stub_driver != nil
         tasmota.remove_driver(_config_stub_driver)
         _config_stub_driver = nil
