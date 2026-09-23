@@ -23,8 +23,7 @@ var dict = {};
   }
 
   /* Load the first reachable URL from `urls`. The build bakes the list (see
-     main.js / vite.config.js __LANG_URLS__): the CDN dictionary alone, or
-     /fs?name=lang.json plus on-device fallbacks for self-host; the dev server
+     main.js / vite.config.js __LANG_URLS__): the CDN dictionary alone; the dev server
      falls back to i18n/de.json (Edge case: lang.json missing on dev server). */
   function load(urls) {
     var i = 0;

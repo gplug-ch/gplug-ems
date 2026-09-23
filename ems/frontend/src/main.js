@@ -142,9 +142,8 @@ function boot() {
      (ASSET_BASE=dev): derive the dev-server URL from import.meta.url so
      lang.json comes from the dev server and live ./lang.json edits show up —
      never the device. In a production build __LANG_URLS__ is statically
-     replaced (vite.config.js): a single CDN URL, or /fs?name=lang.json plus
-     on-device fallbacks for self-host. CDN builds get NO device fallback —
-     lang.json is not packed into the .tapp there (it cost a quarter of the
+     replaced (vite.config.js) by a single CDN URL, with NO device fallback —
+     lang.json is never packed into the .tapp (it cost a quarter of the
      package), and an unreachable CDN means the JS bundle never loaded either. */
   var langUrls = import.meta.env.DEV
     ? [new URL('../lang.json', import.meta.url).href, 'i18n/de.json']
