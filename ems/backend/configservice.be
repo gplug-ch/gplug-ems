@@ -20,6 +20,11 @@
 #
 # `webserver` is imported lazily inside the handler functions so this module
 # stays loadable in the Berry CLI for tests.
+#
+# TRANSIENT (issue #27): main.be's /api/config stub serves GET itself and
+# compiles this module afresh for every POST (fsx.load_transient), dropping
+# it afterwards — so it registers no driver or routes of its own and never
+# sits in the import cache (a lazy `import` kept ~9 KB resident for good).
 
 var configservice = module()
 
@@ -27,13 +32,8 @@ import strict
 import string
 import json
 import logger
-import drivershim
 # `site` is imported lazily (see _get_site) so this module loads in the Berry
 # CLI without pulling in the integration modules the real site.be requires.
-
-# Tasmota driver registration needs a class instance (see drivershim.be);
-# assigned ONCE at module load, below the hook definitions.
-var _driver
 
 # Module-private state: ONE map, mutated in place only (never reassign a
 # top-level var from inside a function — see nethost.be for the Berry
@@ -143,6 +143,9 @@ def save(body)
     if !isinstance(cfg, map)
         return [400, '{"error":"invalid json"}']
     end
+    # the parse was only for that check: let it go before the backup copy
+    # and site.load_config()'s own parse pile onto the heap peak (issue #27)
+    cfg = nil
 
     # snapshot the current file so we can roll back on a failed reload
     var backup = nil
@@ -221,38 +224,7 @@ def postrequest()
     webserver.content_close()
 end
 
-def web_add_handler()
-    import webserver
-    webserver.on('/api/config', /-> getrequest(),  webserver.HTTP_GET)
-    webserver.on('/api/config', /-> postrequest(), webserver.HTTP_POST)
-end
-
-def start()
-    if tasmota.wifi()['up']
-        web_add_handler()
-    end
-    tasmota.add_driver(_driver)
-    logger.logMsg(logger.lInfo, "ConfigService started (/api/config)")
-end
-
-def stop()
-    tasmota.remove_driver(_driver)
-    logger.logMsg(logger.lInfo, "ConfigService stopped")
-end
-
-def save_before_restart()
-    stop()
-end
-
-_driver = drivershim.make({
-    'web_add_handler': web_add_handler,
-    'save_before_restart': save_before_restart
-})
-
-configservice.start    = start
-configservice.stop     = stop
-# request handlers exported so main.be's lazy /api/config stub can delegate
-# to them once the module is loaded on demand (startup-heap issue #2)
+# request handlers for main.be's /api/config stub
 configservice.getrequest  = getrequest
 configservice.postrequest = postrequest
 configservice.save     = save

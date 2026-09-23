@@ -143,4 +143,33 @@ modbusservice.writerequest()
 check(webserver.last_code() == 400, "writerequest without a body -> 400")
 print("Test 7 passed: webserver wrappers")
 
+# --- manual ops vs. the host backoff (panel "connect failed" 502) -----------
+
+import nethost
+tasmota.set_utc(1700000000)         # RTC synced: nethost backoff is live
+var U = '10.0.0.7:502'
+reset()
+nethost.fail(U)                     # e.g. a poll of this host just failed
+check(nethost.skipping(U), "host is in backoff")
+check(modbustcp.fetch_item(U, nil, {'register': 1}) == nil && _mb['connects'] == 0,
+      "a poll still honours the backoff")
+_mb['regs'][1001] = 0x3FC0
+r = modbusservice.read({'url': U, 'register': '1001', 'dtype': 'float32'})
+check(r[0] == 200 && json.load(r[1])['value'] == 1.5, f"manual read ignores the backoff, got {r}")
+check(!nethost.skipping(U), "a manual success clears the backoff")
+r = modbusservice.write(json.dump({'url': U, 'register': 7, 'dtype': 'uint16', 'value': 3}))
+check(r[0] == 200, "manual write ignores the backoff")
+
+reset()
+_mb['mute'] = true
+r = modbusservice.read({'url': U, 'register': '5', 'dtype': 'uint16'})
+check(r[0] == 502 && json.load(r[1])['error'] == 'no/short response', f"silent device -> 502, got {r}")
+check(!nethost.skipping(U), "a manual failure does not put the host in backoff")
+r = modbusservice.read({'url': 'nocolon', 'register': '5'})
+check(r[0] == 400, "malformed url is a 400 before any connect")
+check(modbustcp.read_register('bad', {'register': 5, 'manual': true})['error']
+      == "bad url 'bad', expected <ip>:<port>", "bad url names itself")
+tasmota.set_utc(0)
+print("Test 8 passed: manual ops bypass the host backoff")
+
 print(f"\n--- All modbusservice tests passed ({passed} checks) ---")

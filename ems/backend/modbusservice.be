@@ -20,9 +20,11 @@ import logger
 # configured load's coil "write" block) and only on an explicit POST — no
 # GET ever writes. Every manual write is logged at Warn, the default level.
 #
-# LAZY (startup-heap issue #2): main.be's stub imports this module on the
-# first request, like configservice. The exchange runs inline in the request
-# handler — one user-initiated op, answered with one small JSON reply.
+# TRANSIENT (issue #27): main.be's stub compiles this module afresh for
+# every request (fsx.load_transient) and drops it afterwards, so it never
+# sits in the import cache — a lazy `import` only deferred its heap cost. The
+# exchange runs inline in the request handler — one user-initiated op,
+# answered with one small JSON reply.
 
 var DTYPES = ['float32', 'int16', 'uint16', 'int32', 'uint32']
 
@@ -39,12 +41,16 @@ def _site()
     return _s['site']
 end
 
+# the modbustcp module: the one site.be registered at boot when an item uses
+# it, else a transient copy — never `import`, which would keep it resident
+# for the rest of the session (issue #27). Not cached in _s: this module is
+# itself dropped after the request.
 def _mb()
-    if _s['mb'] == nil
-        import modbustcp
-        _s['mb'] = modbustcp
-    end
-    return _s['mb']
+    if _s['mb'] != nil return _s['mb'] end
+    var m = _site().registered_integration('modbustcp')
+    if m != nil return m end
+    import fsx
+    return fsx.load_transient('modbustcp')
 end
 
 def set_site(m) _s['site'] = m end
@@ -169,6 +175,7 @@ def read(a)
         end
     end
     spec['function'] = func
+    spec['manual'] = true    # the user clicked: ignore the poll backoff
     return _reply(_mb().read_register(r[0], spec))
 end
 
@@ -194,6 +201,7 @@ def write(body)
     if func != nil && func != 6 && func != 16 && !coil_block
         return _err(400, 'function must be 6 or 16 (holding registers)')
     end
+    spec['manual'] = true    # the user clicked: ignore the poll backoff
     var res = _mb().write_register(r[0], spec, value)
     logger.logMsg(logger.lWarn,
         f"Modbus: manual write '{r[0]}' unit {spec['unit']} reg {spec['register']} value {value} -> {json.dump(res)}")

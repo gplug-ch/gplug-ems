@@ -256,25 +256,35 @@ def _apply(v, scale, kw)
     return v
 end
 
-# Open a connection to "<ip>:<port>"; nil (logged, backoff noted) if the host
-# is in its cool-off window, the url is malformed or the connect fails.
-def _connect(url)
-    if nethost.skipping(url)
-        return nil
+# note a failed exchange for the host backoff — but not for a MANUAL op
+# (Einstellungen test panel): a typo'd address there must not stall the
+# polling of a working device on that host
+def _fail(url, manual)
+    if !manual nethost.fail(url) end
+end
+
+# Open a connection to "<ip>:<port>". Returns [tc, nil], or [nil, reason] if
+# the host is in its cool-off window, the url is malformed or the connect
+# fails (logged, backoff noted). A MANUAL op (`manual` true) ignores the
+# cool-off: the user asked for exactly this one exchange, and answering
+# "connect failed" for a host nobody even tried was the panel's 502 mystery.
+def _connect(url, manual)
+    if !manual && nethost.skipping(url)
+        return [nil, "host in backoff after earlier failures"]
     end
     var parts = string.split(str(url), ":")
     if size(parts) != 2
         logger.logMsg(logger.lWarn, f"modbustcp: bad url '{url}', expected <ip>:<port>")
-        return nil
+        return [nil, f"bad url '{url}', expected <ip>:<port>"]
     end
     var tc = tcpclient()
     if !tc.connect(parts[0], int(parts[1]), CONNECT_TIMEOUT_MS)
         logger.logMsg(logger.lWarn, f"modbustcp: connect '{url}' failed")
-        nethost.fail(url)
+        _fail(url, manual)
         tc.close()
-        return nil
+        return [nil, f"connect to {url} failed (no answer within {CONNECT_TIMEOUT_MS} ms)"]
     end
-    return tc
+    return [tc, nil]
 end
 
 # Read ONE register (pair) on an open connection. Returns [value, data] —
@@ -343,7 +353,7 @@ def fetch_item(url, token, cfg)
     end
     var tc = nil
     try
-        tc = _connect(url)
+        tc = _connect(url, false)[0]
         if tc == nil return nil end
         var unit = cfg.find("unit", 1)
         var func = cfg.find("function", 3)
@@ -403,15 +413,18 @@ def fetch_item(url, token, cfg)
 end
 
 # Read one register by an explicit spec {unit, function, register, dtype,
-# swap_words, scale, dimension} — the manual read (issue #20). Returns
-# {"value", "raw": [words]}, {"exception": code} or {"error": msg}.
+# swap_words, scale, dimension, manual} — the manual read (issue #20).
+# Returns {"value", "raw": [words]}, {"exception": code} or {"error": msg}.
+# "manual": true bypasses the host backoff (see _connect).
 def read_register(url, spec)
     var reg = spec.find("register", nil)
     if reg == nil return {"error": "no register"} end
+    var manual = spec.find("manual", false)
     var tc = nil
     try
-        tc = _connect(url)
-        if tc == nil return {"error": "connect failed"} end
+        var c = _connect(url, manual)
+        tc = c[0]
+        if tc == nil return {"error": c[1]} end
         var r = _read_one(tc, spec.find("unit", 1), spec.find("function", 3), reg,
                           spec.find("dtype", "float32"), spec.find("swap_words", false))
         tc.close()
@@ -421,7 +434,7 @@ def read_register(url, spec)
                 nethost.ok(url)   # the device answered: config error, not a dead host
                 return {"exception": r[1]}
             end
-            nethost.fail(url)
+            _fail(url, manual)
             return {"error": r[1]}
         end
         nethost.ok(url)
@@ -429,7 +442,7 @@ def read_register(url, spec)
                 "raw": _words(r[1])}
     except .. as e
         logger.logMsg(logger.lWarn, f"modbustcp: '{url}' reg {reg} read failed: {e}")
-        nethost.fail(url)
+        _fail(url, manual)
         if tc != nil tc.close() end
         return {"error": str(e)}
     end
@@ -439,7 +452,8 @@ end
 # before encoding) to one holding register (pair) or coil, spec as
 # read_register plus "function" 6|16|5 (default by dtype). The reply must
 # echo the request. Returns {"ok": true, "function", "raw": [words]},
-# {"exception": code} or {"error": msg}. Every write is logged.
+# {"exception": code} or {"error": msg}. Every write is logged. "manual":
+# true bypasses the host backoff (see _connect).
 def write_register(url, spec, value)
     var reg = spec.find("register", nil)
     if reg == nil return {"error": "no register"} end
@@ -478,10 +492,12 @@ def write_register(url, spec, value)
                         : _build_write16(tid, unit, reg, data)
     end
     logger.logMsg(logger.lInfo, f"modbustcp: write '{url}' unit {unit} reg {reg} FC {func} value {value}")
+    var manual = spec.find("manual", false)
     var tc = nil
     try
-        tc = _connect(url)
-        if tc == nil return {"error": "connect failed"} end
+        var c = _connect(url, manual)
+        tc = c[0]
+        if tc == nil return {"error": c[1]} end
         var r = _transact(tc, req, func)
         tc.close()
         if r[0] == nil
@@ -490,21 +506,21 @@ def write_register(url, spec, value)
                 nethost.ok(url)
                 return {"exception": r[1]}
             end
-            nethost.fail(url)
+            _fail(url, manual)
             return {"error": r[1]}
         end
         # FC 5/6 echo the whole request PDU; FC 16 echoes address + quantity
         var resp = r[0]
         if resp.size() < WRITE_REPLY_SIZE || resp[8..11].tohex() != req[8..11].tohex()
             _log_err(url, reg, "reply does not echo the request")
-            nethost.fail(url)
+            _fail(url, manual)
             return {"error": "reply does not echo the request"}
         end
         nethost.ok(url)
         return {"ok": true, "function": func, "raw": data != nil ? _words(data) : [req.get(10, -2)]}
     except .. as e
         logger.logMsg(logger.lWarn, f"modbustcp: '{url}' reg {reg} write failed: {e}")
-        nethost.fail(url)
+        _fail(url, manual)
         if tc != nil tc.close() end
         return {"error": str(e)}
     end

@@ -142,6 +142,62 @@ def list_daynos(dir, pat)
     return sort_ints(out)
 end
 
+# --- transient modules (issue #27) ------------------------------------------
+# `import` puts a module in Berry's import cache for good — there is no way to
+# evict it — so a lazily imported service (modbusservice, configservice) only
+# DEFERS its heap cost, it never gives it back. load_transient() compiles the
+# module's source and runs it, returning the module object WITHOUT touching
+# the import cache: once the caller drops the reference, GC frees the
+# bytecode. Every call compiles afresh (the same transient peak the first
+# import paid), so this is for rarely used request handlers only, never for a
+# hot path. Modules the transient one imports itself (logger, json, ...) are
+# cached as usual — they are resident anyway.
+#
+# The source is wrapped in `do … end` before compiling: a chunk compiled with
+# compile() runs in GLOBAL scope, so its top-level `var`/`def` would become
+# Berry globals — clobbering same-named globals and, worse, keeping every
+# function (and so the whole bytecode) reachable, i.e. resident again. Inside
+# a block they are locals of the chunk, as under `import`. "do " goes on the
+# first line so error line numbers still match the file.
+
+# the source of module `name`: from the .tapp root on-device (autoexec.be
+# stashed its "…tapp#" prefix in global._tapp_wd), else along sys.path() —
+# the Berry CLI, where the integrations live in their own subdirectory
+def _module_src(name)
+    var cands = []
+    var wd = nil
+    try
+        import global
+        wd = global._tapp_wd
+    except ..
+    end
+    if type(wd) == 'string' && size(wd) > 0 cands.push(wd + name + '.be') end
+    import sys
+    for p : sys.path()
+        cands.push(p + '/' + name + '.be')
+        cands.push(p + '/integrations/' + name + '.be')
+    end
+    for c : cands
+        var f = nil
+        try
+            f = open(c, 'r')
+            var src = f.read()
+            f.close()
+            return src
+        except ..
+            close_q(f)
+        end
+    end
+    return nil
+end
+
+def load_transient(name)
+    var src = _module_src(name)
+    if src == nil raise 'import_error', f"module '{name}' not found" end
+    return compile('do ' + src + '\nend', 'string')()
+end
+
+fsx.load_transient = load_transient
 fsx.remove       = remove
 fsx.listdir      = listdir
 fsx.append_line  = append_line
