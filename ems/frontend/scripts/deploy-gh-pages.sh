@@ -25,7 +25,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 git clone --quiet --depth 1 "$CDN_REPO" "$TMP/cdn"
 
-# JS/CSS bundle + lang.json go to the CDN; the index.html shell ships inside
+# JS/CSS bundle + lang*.json go to the CDN; the index.html shell ships inside
 # the .tapp, never from the CDN.
 rsync -a --delete --exclude='index.html' "$SRC/" "$TMP/cdn/$VERSION/"
 

@@ -9,7 +9,7 @@ This guide covers how to set up, configure, and run the gPlug Energy Management 
 | Docker + Docker Compose | Running the simulator |
 | Node.js + Yarn 4 | Building the simulator frontend (dev only) |
 | Java 21 | Running the simulator locally without Docker (dev only; Gradle comes via `./gradlew`) |
-| Node.js + npm, Python 3 | Building the EMS `.tapp` (dev only) |
+| Node.js + npm, Python 3 | Building the EMS `.tapp` yourself (dev only — releases ship it prebuilt) |
 | Berry CLI | Running the EMS backend tests, `make test` (dev only) |
 | gPlug ESP32 (Tasmota) | Production deployment |
 
@@ -146,11 +146,15 @@ Key fields:
 
 **Production types:** `PHOTOVOLTAIC`, `BATTERY`
 
-### 2. Build the `.tapp`
+### 2. Get the `.tapp`
 
-```sh
-make   # at the repo root; produces build/ems-v<VERSION>.tapp
-```
+Download it from the [latest GitHub Release](https://github.com/jluthiger/gplug-ems/releases/latest).
+Pick one: `ems-v<VERSION>.tapp` (German UI) or `ems-v<VERSION>-en.tapp`
+(English UI). Either way the device loads the UI assets from the CDN, so the
+browser needs internet access.
+
+Or build it yourself (repo root): `make` → `build/ems-v<VERSION>.tapp`
+(`make LANG=en` for English).
 
 ### 3. Deploy to the gPlug device
 
@@ -161,9 +165,12 @@ make flash DEVICE=<gplug-ip>   # removes stale .tapp files, then uploads the new
 Or manually:
 
 1. Open the Tasmota web UI at `http://<gplug-ip>/`
-2. Go to **Tools → Manage File system**, delete any older `ems-v*.tapp` (Tasmota boots every `.tapp` in the root) and upload `build/ems-v<VERSION>.tapp`
+2. Go to **Tools → Manage File system**, delete any older `ems-v*.tapp` (Tasmota boots every `.tapp` in the root) and upload the new `.tapp`
 3. Upload your `site.json` via the same filesystem manager (it can later be edited in the EMS UI under **Einstellungen**)
 4. Restart the device
+
+For a downloaded release, `ems/backend/deploy.sh <gplug-ip> <file.tapp>` (from a
+checkout) does the same as `make flash`.
 
 ### 4. Access the EMS frontend
 
@@ -192,6 +199,7 @@ Pages: **Übersicht** (live grid, productions and loads; manual state transition
 | Start simulator (Docker) | `cd simulator/backend && docker compose up --build` |
 | Simulator React frontend | `http://localhost:9090/simulator/` |
 | Simulator Swagger UI | `http://localhost:9090/simulator/swagger-ui.html` |
+| Download EMS `.tapp` | https://github.com/jluthiger/gplug-ems/releases/latest |
 | Build EMS `.tapp` | `make` (repo root) |
 | Upload `.tapp` to a device | `make flash DEVICE=<gplug-ip>` |
 | Run simulator without Docker | `make sim-run` |

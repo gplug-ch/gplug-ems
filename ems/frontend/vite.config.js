@@ -79,6 +79,12 @@ function buildLangDict() {
   return merged;
 }
 
+// Dictionary file name. CDN/mirror builds of every language share one
+// dist/<version>/ directory (and one CDN version folder), so a non-German
+// dictionary gets its own name (lang-en.json) instead of overwriting the
+// German lang.json. Dev keeps lang.json: the dev server serves one language.
+const langFile = uilang === 'de' || isDev ? 'lang.json' : `lang-${uilang}.json`;
+
 // Device endpoints proxied in dev (see `server.proxy` below). `/api` covers
 // /api/power|energy|meta|meter|modbus|config; /cm is the Tasmota command
 // endpoint used for Wi-Fi settings and restart.
@@ -93,7 +99,7 @@ export default defineConfig(({ command }) => {
   // No device fallback: lang.json is not packed into the .tapp and, more to
   // the point, an unreachable CDN means the JS bundle never loaded either —
   // there is no app left to translate.
-  const langUrls = [`${base}lang.json`];
+  const langUrls = [`${base}${langFile}`];
 
   return {
   // The CDN base only applies to the built bundle; the dev server always
@@ -130,7 +136,9 @@ export default defineConfig(({ command }) => {
   },
   build: {
     outDir,
-    emptyOutDir: true,
+    // KEEP_DIST=1 adds to dist/<version>/ instead of wiping it: `make release`
+    // builds de then en into the same CDN version directory and deploys both.
+    emptyOutDir: process.env.KEEP_DIST !== '1',
     assetsDir: 'assets',
   },
   plugins: [
@@ -146,7 +154,7 @@ export default defineConfig(({ command }) => {
       generateBundle() {
         this.emitFile({
           type: 'asset',
-          fileName: 'lang.json',
+          fileName: langFile,
           source: JSON.stringify(buildLangDict()),
         });
       },

@@ -30,7 +30,7 @@ All `make` targets run from the repo root (single root `Makefile`; `make help` l
 | EMS | `make build-dev` | `.tapp` whose shell loads the UI from `make dev` (HMR on a device) |
 | EMS | `make test` | Berry tests + frontend tests (`test-backend`, `test-frontend`) |
 | EMS backend | `cd ems/backend/tests && berry -m .. test_ems_allocation.be` | Single test |
-| EMS | `make release` | Production release: build CDN `.tapp` + deploy frontend bundle to GitHub Pages (gplug-cdn) |
+| EMS | `make release` | Production release (clean `main` = `origin/main`, new `VERSION.txt`): build de + en `.tapp`s into `release/`, deploy the CDN bundle to GitHub Pages (gplug-cdn), create GitHub Release `v<VERSION>` with the `.tapp`s + generated notes (`DRYRUN=1` builds only) |
 | EMS | `make deploy-cdn` | Publish the already-built frontend bundle to the CDN only |
 | EMS | `make flash DEVICE=<ip>` | Upload `.tapp` to a device (removes stale `.tapp`s first; `DRYRUN=1`) |
 | EMS frontend | `make dev` | Dev server (Vite HMR) |
@@ -118,4 +118,4 @@ every data write is an append.
 
 ### Build output
 
-`make` at the repo root produces `build/ems-v<VERSION>.tapp` — a zip (no compression) containing minified Berry sources and the Vite-built `index.html` shell. The Makefile runs the Vite build (`ems/frontend`, which bakes the versioned CDN URLs into `index.html`) and always runs `bundle.py --lang-only` for the i18n completeness check. The JS/CSS **and `lang.json`** always live on GitHub Pages (gplug-cdn repo), not in the `.tapp` (the ~23 KB dictionary would be a quarter of the package for a fallback nobody can reach — a dead CDN takes the JS bundle with it); the device reads its build language from `<html lang>` in the shell instead.
+`make` at the repo root produces `build/ems-v<VERSION>.tapp` — a zip (no compression) containing minified Berry sources and the Vite-built `index.html` shell. The Makefile runs the Vite build (`ems/frontend`, which bakes the versioned CDN URLs into `index.html`) and always runs `bundle.py --lang-only` for the i18n completeness check. The JS/CSS **and `lang.json`** always live on GitHub Pages (gplug-cdn repo), not in the `.tapp` (the ~23 KB dictionary would be a quarter of the package for a fallback nobody can reach — a dead CDN takes the JS bundle with it); the device reads its build language from `<html lang>` in the shell instead. File names: `ems-v<VERSION>[-<lang>].tapp` (German has no language suffix). A non-German build names its CDN dictionary `lang-<lang>.json`, so `make release` can build de and en into one `dist/v<VERSION>/` (`KEEP_DIST=1` skips Vite's `emptyOutDir`) and publish both to the CDN. Release notes: `.github/release-notes.md` (header, `@VERSION@` placeholder) + `gh --generate-notes` grouped by `.github/release.yml`.

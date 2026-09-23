@@ -49,7 +49,8 @@ npm-managed dependencies. See `README.md` for the full build/deploy flow.
   (`pages/*.js`), boot + routes (`main.js`).
 
 **Build modes** (`ASSET_BASE`, in `vite.config.js`): `cdn` (default) serves the
-bundle *and* `lang.json` from a CDN — device ships only `index.html` (the ~23 KB
+bundle *and* `lang.json` (`lang-<lang>.json` for a non-German build, so de and
+en share one CDN version dir) from a CDN — device ships only `index.html` (the ~23 KB
 dictionary is not packed: if the CDN is down the JS bundle is gone too, so an
 on-device copy saves nothing); `<url>` does the same from an internal mirror;
 `dev` makes the
