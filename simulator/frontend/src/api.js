@@ -41,3 +41,19 @@ export async function setGridPower(siteId, gridId, power) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }
+
+export async function fetchModbus() {
+  const res = await fetch(`${BASE}/modbus`)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function setModbusValue(unit, table, address, value) {
+  const res = await fetch(`${BASE}/modbus/${unit}/${table}/${address}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}

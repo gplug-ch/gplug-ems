@@ -25,11 +25,12 @@ and talks to its REST API under `/simulator` (in dev via the Vite proxy in `vite
 **Source layout:**
 - `src/api.js` — fetch wrappers: `GET /sites`, `GET /sites/{id}/grid`,
   `PUT …/loads/{id}/state` (`{state:"WAITING"}`), `PUT …/productions/{id}/power`,
-  `PUT …/grid/{meterId}/power`
+  `PUT …/grid/{meterId}/power`, `GET /modbus`, `PUT /modbus/{unit}/{table}/{address}`
 - `src/App.jsx` — the whole UI: overview tab (site/active/waiting counts, total production,
   active & waiting loads) plus one tab per site with grid import/export sliders, production
   sliders (battery signed, with SoC), and load cards whose «ACTIVATE» / «ACTIVATE ALL» buttons set inactive loads to `WAITING`;
-  polls `/sites` every 3 s; dark/light theme persisted in `localStorage` (`ems-sim-theme`)
+  a «MODBUS» tab lists the simulator's Modbus registers (raw words, decoded value; static and
+  action registers editable inline); polls `/sites` and `/modbus` every 3 s; dark/light theme persisted in `localStorage` (`ems-sim-theme`)
 - `src/App.css`, `src/index.css` — plain CSS, no UI framework
 
 The UI never sets a load `ACTIVE`: that transition is the EMS device's job.
