@@ -9,11 +9,12 @@ A Tasmota Berry scripting backend for an Energy Management System (EMS) that dis
 ## Build commands
 
 ```bash
-make          # clean + build .tapp file (full build)
-make tapp     # minify Berry sources, copy frontend, package into .tapp zip
-make minify   # only minify Berry sources into build/
-make test     # run all Berry tests with the Berry CLI
-make clean    # remove build/ directory
+# all make targets run from the repo root (`make help` lists them)
+make               # clean + build build/ems-v<VERSION>.tapp (CDN shell)
+make build-self    # self-hosted .tapp (assets + lang.json packed in)
+make test-backend  # run all Berry tests with the Berry CLI
+make test          # Berry + frontend tests
+make clean         # remove build/ directory
 ```
 
 Run a single test file:
@@ -82,7 +83,7 @@ Loads have three states: `inactive` (user-deselected), `waiting` (requested but 
 - There is no `ems.json` — it was folded into `site.json`.
 
 ### Build artifacts
-The Makefile minifies Berry sources with `minify.py` (strips `#` comments, collapses blank lines), runs the Vite build in `../frontend` (which bakes the versioned CDN URLs into the `index.html` shell) and always runs `bundle.py --lang-only` for the i18n completeness check, then zips everything into `build/ems-v<VERSION>.tapp` (`-<lang>` suffix when `LANG` is set). The `.tapp` is a standard zip with no compression (`-0`). In the default CDN mode the hashed JS/CSS **and `lang.json`** stay on GitHub Pages (`gplug-ch/gplug-cdn`) and only the shell is packed; `make ASSET_BASE=self` packs the assets and `lang.json` into the `.tapp` and points the shell at `/fs?name=`.
+The Makefile minifies Berry sources with `minify.py` (strips `#` comments, collapses blank lines), runs the Vite build in `ems/frontend` (which bakes the versioned CDN URLs into the `index.html` shell) and always runs `bundle.py --lang-only` for the i18n completeness check, then zips everything into `build/ems-v<VERSION>.tapp` (`-<lang>` suffix when `LANG` is set). The `.tapp` is a standard zip with no compression (`-0`). In the default CDN mode the hashed JS/CSS **and `lang.json`** stay on GitHub Pages (`gplug-ch/gplug-cdn`) and only the shell is packed; `make build-self` packs the assets and `lang.json` into the `.tapp` and points the shell at `/fs?name=`.
 
 ### Testing
 `tests/tasmota.be` is a stub for the Tasmota built-in `tasmota` module (unavailable in Berry CLI). Tests that need `webclient` define their own stub at global scope before `import ems`. Test data fixtures are in `tests/site.json` (plus `tests/netgate/`, `tests/battery/` and `tests/modbus/`).

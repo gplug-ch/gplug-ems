@@ -5,3 +5,4 @@ private/
 ems/frontend/.yarn/
 ems/frontend/.yarnrc.yml
 simulator/frontend/.yarn/install-state.gz
+build/

@@ -20,20 +20,20 @@ and the frontend can be developed on your laptop against a real device.
 | `make`, `zip`, `python3` | building the `.tapp` | `python3` runs `minify.py` and `bundle.py` |
 | [Berry CLI](https://github.com/berry-lang/berry) (`berry`) | running the backend tests | 1.1.0; build it once from source, put it on `$PATH` |
 | Node.js + npm | frontend dev server and Vite build | Node 20+ |
-| `curl` | `make deploy` | talks to the device's Tasmota HTTP API |
+| `curl` | `make flash` | talks to the device's Tasmota HTTP API |
 | A gPlug (ESP32-C3) with Tasmota | running the backend | any Tasmota build with Berry + the filesystem; **no `USE_CORS`** — see [CORS](#cors) |
 
 ---
 
 ## Backend development
 
-Everything happens in `backend/`.
+Sources live in `backend/`; all `make` targets run from the repo root
+(`make help` lists them).
 
 ```bash
-cd ems/backend
-
-make test                                   # all Berry tests
-cd tests && berry -m .. test_ems_allocation.be   # one test file
+make test-backend                           # all Berry tests
+make test                                   # Berry + frontend tests
+cd ems/backend/tests && berry -m .. test_ems_allocation.be   # one test file
 ```
 
 `-m ..` puts `backend/` on the Berry module path so `import ems` resolves.
@@ -47,16 +47,16 @@ needs the real firmware, so the loop is *write → test in the CLI → flash*.
 
 ```bash
 make                                # build/ems-v<version>.tapp  (CDN shell — default)
-make ASSET_BASE=self                # assets + lang.json packed into the .tapp
-make ASSET_BASE=dev                 # shell loads the UI from your `npm run dev` server
+make build-self                     # assets + lang.json packed into the .tapp
+make build-dev                      # shell loads the UI from your `make dev` server
 make LANG=en                        # English build -> ems-v<version>-en.tapp
 
-make deploy DEVICE=192.168.1.42     # delete stale .tapps, upload, restart
-make deploy DEVICE=192.168.1.42 DRYRUN=1
-make deploy DEVICE=... WEBUSER=admin WEBPASS=secret
+make flash DEVICE=192.168.1.42      # delete stale .tapps, upload, restart
+make flash DEVICE=192.168.1.42 DRYRUN=1
+make flash DEVICE=... WEBUSER=admin WEBPASS=secret
 ```
 
-**Always deploy with `make deploy`, never by dragging the file into the
+**Always flash with `make flash`, never by dragging the file into the
 Tasmota file manager.** Tasmota runs `autoexec.be` from *every* `*.tapp` in the
 filesystem root and the version is part of the filename, so a bare upload
 leaves the previous release in place: both apps boot, the module graph is built
@@ -64,8 +64,9 @@ twice and the boot heap roughly doubles — which on
 an ESP32-C3 is a reboot loop. `deploy.sh` deletes the stale ones first.
 
 Bump `VERSION.txt` before a release; it names the `.tapp` and the CDN asset
-directory. `make prod` builds the CDN `.tapp` *and* publishes the matching
-bundle to GitHub Pages (needs push access to `gplug-ch/gplug-cdn`).
+directory. `make release` builds the CDN `.tapp` *and* publishes the matching
+bundle to GitHub Pages (needs push access to `gplug-ch/gplug-cdn`);
+`make deploy-cdn` publishes an already-built bundle only.
 
 ### On-device configuration
 
@@ -152,8 +153,8 @@ Do *not* add `?host=` in this mode — it bypasses the proxy (see [CORS](#cors))
 ### B. Frontend on your computer, page served by the gPlug (dev shell)
 
 ```bash
-cd ems/backend && make ASSET_BASE=dev && make deploy DEVICE=192.168.1.42
-cd ../frontend && npm run dev
+make build-dev && make flash DEVICE=192.168.1.42
+make dev
 # open http://192.168.1.42  (the device, not localhost)
 ```
 
@@ -217,7 +218,7 @@ The version comes from the repo-root `VERSION.txt` (or `APP_VERSION`). Output is
 nested under the version in `dist/<version>/` (or `dist/self/`, `dist/dev/`), so
 the deployed paths match the base baked into the shell.
 
-Normally you do not call these directly — the backend Makefile drives the Vite
+Normally you do not call these directly — the root Makefile drives the Vite
 build and packs the shell into the `.tapp` (see
 [Build and flash](#build-and-flash)); `make CDN_BASE_URL=https://cdn.example`
 points a build at a different host.
@@ -235,8 +236,8 @@ at `https://gplug-ch.github.io/gplug-cdn/<version>/…`, matching the URLs baked
 into the shell. Version directories already in the repo are never touched, so
 devices flashed with an older version keep resolving their assets. Needs push
 access to the repo (an authenticated `git`); override the target with
-`CDN_REPO=<url>`. `make prod` in `backend/` does the `.tapp` build and this
-deploy in one step.
+`CDN_REPO=<url>`. `make deploy-cdn` runs this script; `make release` does the
+`.tapp` build and this deploy in one step.
 
 The old Cloudflare Pages deploy is still available as `npm run
 deploy:cloudflare` (needs `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`).
@@ -254,7 +255,7 @@ Adding a language:
 
 1. Copy `i18n/de.json` to `i18n/<lang>.json` and translate the values
    (`meta.lang` is set automatically at build time).
-2. Build with `make LANG=<lang>` in `backend/` (and `LANG=<lang>` on
+2. Build with `make LANG=<lang>` at the repo root (and `LANG=<lang>` on
    `npm run build` for the CDN bundle).
 
 ---

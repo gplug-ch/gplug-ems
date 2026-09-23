@@ -110,7 +110,7 @@ nothing rather than to a stale line.
 **Load object fields:** `id`, `name`, `state`, `power` (rated watts), `priority` (lower = higher priority), optional `url`.
 **Production object fields:** `id`, `name`, `currentPower` (or `current_power`), optional `url`.
 
-**Build note:** `cd ../backend && make` runs the Vite build and packs the shell
+**Build note:** `make` (repo root) runs the Vite build and packs the shell
 into the `.tapp`. In CDN mode the shell references `https://<CDN_BASE_URL>/<version>/…`;
-in `ASSET_BASE=self` mode it references `/fs?name=<hashed-file>` and the assets
+in `ASSET_BASE=self` mode (`make build-self`) it references `/fs?name=<hashed-file>` and the assets
 are packed on-device. Don't hand-edit `index.html` asset refs — Vite owns them.

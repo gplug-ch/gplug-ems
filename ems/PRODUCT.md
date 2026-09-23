@@ -53,7 +53,7 @@ Two positions a neighbouring product could not truthfully copy:
 
 - **Runtime:** Preact SPA, no build step required for the device; a Vite build bakes versioned
   CDN URLs into a tiny `index.html` shell served from the `.tapp`. The JS/CSS bundle loads from
-  Cloudflare Pages in CDN mode; `make ASSET_BASE=self` packs assets into the `.tapp` for
+  Cloudflare Pages in CDN mode; `make build-self` packs assets into the `.tapp` for
   offline/restricted networks.
 - **Network:** local LAN only; the frontend polls the device (`/loads`, `/productions` every 2 s;
   raw `/api/*` for analytics). Each device is standalone.
