@@ -293,7 +293,10 @@ def _actuate_load(id, state)
     if url == nil || url == "" return end
     var intg = _get_integration(load.find("integration", nil))
     if intg != nil
-        intg.set_state(url, load.find("token", nil), state)
+        # the load map as 4th argument: modbustcp needs its "write" register,
+        # unit and dtype (issue #20); shelly/simulator ignore it (Berry drops
+        # excess arguments)
+        intg.set_state(url, load.find("token", nil), state, load)
     end
 end
 
