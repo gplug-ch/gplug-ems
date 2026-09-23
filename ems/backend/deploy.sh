@@ -22,7 +22,7 @@ TAPP="${2:-}"
 if [ -z "$TAPP" ]; then
     TAPP=$(ls -t build/*.tapp 2>/dev/null | head -1 || true)
 fi
-[ -n "$TAPP" ] && [ -f "$TAPP" ] || { echo "no .tapp found — run 'make' first" >&2; exit 2; }
+[ -n "$TAPP" ] && [ -f "$TAPP" ] || { echo "no .tapp found — run 'make' at the repo root first" >&2; exit 2; }
 NEW=$(basename "$TAPP")
 
 AUTH=""

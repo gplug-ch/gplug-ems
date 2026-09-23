@@ -143,8 +143,7 @@ Key fields:
 ### 2. Build the `.tapp`
 
 ```sh
-cd ems/backend
-make   # produces build/ems-v<VERSION>.tapp
+make   # at the repo root; produces build/ems-v<VERSION>.tapp
 ```
 
 ### 3. Deploy to the gPlug device
@@ -181,6 +180,6 @@ This dashboard shows all loads and productions, their current states, and allows
 | Start simulator (Docker) | `cd simulator/backend && docker compose up --build` |
 | Simulator React frontend | `http://localhost:9090/simulator/` |
 | Simulator Swagger UI | `http://localhost:9090/simulator/swagger-ui.html` |
-| Build EMS `.tapp` | `cd ems/backend && make` |
+| Build EMS `.tapp` | `make` (repo root) |
 | EMS frontend (on device) | `http://<gplug-ip>/app` |
 | Tasmota admin UI | `http://<gplug-ip>/` |

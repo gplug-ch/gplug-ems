@@ -42,7 +42,7 @@ curl 'http://192.168.0.97/productions' | jq
 
 - uses [preact](https://preactjs.com/) with [htm](https://github.com/developit/htm) as javascript single page application — tagged templates instead of JSX
 - built with [Vite](https://vite.dev/); no runtime CSS or charting framework: the styling is hand-written CSS and the graphs are hand-rolled SVG (`src/charts.js`)
-- the device ships only a small `index.html` shell in the `.tapp`; the hashed JS/CSS bundle and the `lang.json` dictionary are downloaded from a CDN (GitHub Pages, `gplug-ch/gplug-cdn`), versioned by `VERSION.txt`. `make ASSET_BASE=self` packs them back into the `.tapp` for offline networks
+- the device ships only a small `index.html` shell in the `.tapp`; the hashed JS/CSS bundle and the `lang.json` dictionary are downloaded from a CDN (GitHub Pages, `gplug-ch/gplug-cdn`), versioned by `VERSION.txt`. `make build-self` packs them back into the `.tapp` for offline networks
 - visualize one site, represented by its backend
 - shows the state of all loads: inactive, waiting, active
 - shows for each load its data as a 2d-graph

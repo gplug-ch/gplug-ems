@@ -22,24 +22,29 @@ Each subdirectory has its own `CLAUDE.md` with component-specific commands and a
 
 ## Quick command reference
 
+All `make` targets run from the repo root (single root `Makefile`; `make help` lists them).
+
 | Component | Command | Purpose |
 |-----------|---------|---------|
-| EMS backend | `cd ems/backend && make` | Build `.tapp` file |
-| EMS backend | `cd ems/backend && make test` | Run Berry tests |
+| EMS | `make` / `make build` | Build `build/ems-v<VERSION>.tapp` (CDN shell; `LANG=en` for English) |
+| EMS | `make build-self` | Self-hosted `.tapp` (JS/CSS + `lang.json` packed in) |
+| EMS | `make build-dev` | `.tapp` whose shell loads the UI from `make dev` (HMR on a device) |
+| EMS | `make test` | Berry tests + frontend tests (`test-backend`, `test-frontend`) |
 | EMS backend | `cd ems/backend/tests && berry -m .. test_ems_allocation.be` | Single test |
-| EMS backend | `cd ems/backend && make prod` | Production release: build `.tapp` + deploy frontend bundle to GitHub Pages (gplug-cdn) |
-| EMS frontend | `cd ems/frontend && npm run dev` | Dev server (Vite HMR) |
-| EMS frontend | `cd ems/frontend && npm run build && npm run deploy` | Build + deploy bundle to GitHub Pages (gplug-cdn) |
-| Simulator backend | `cd simulator/backend && ./gradlew bootRun` | Run simulator |
-| Simulator backend | `cd simulator/backend && ./gradlew test` | Run tests |
+| EMS | `make release` | Production release: build CDN `.tapp` + deploy frontend bundle to GitHub Pages (gplug-cdn) |
+| EMS | `make deploy-cdn` | Publish the already-built frontend bundle to the CDN only |
+| EMS | `make flash DEVICE=<ip>` | Upload `.tapp` to a device (removes stale `.tapp`s first; `DRYRUN=1`) |
+| EMS frontend | `make dev` | Dev server (Vite HMR) |
+| Simulator backend | `make sim-run` | Run simulator |
+| Simulator backend | `make sim-test` | Run tests |
 | Simulator frontend | `cd simulator/frontend && yarn dev` | Dev server (HMR) |
-| Simulator frontend | `cd simulator/frontend && yarn deploy` | Build + copy to backend |
+| Simulator frontend | `make sim-ui` | Build + copy to backend |
 
 ## High-level architecture
 
 ### Two runtimes, one domain model
 
-**EMS (production):** Berry scripts packaged as a `.tapp` deployed on Tasmota ESP32 firmware. The device ships only a tiny `index.html` shell; the Vite-built JS/CSS bundle and the `lang.json` dictionary are served from a CDN (GitHub Pages, gplug-ch/gplug-cdn), versioned by `VERSION.txt`. A self-host mode (`make ASSET_BASE=self`) packs the assets back into the `.tapp` for offline/restricted networks. Each device is standalone: it runs the allocation algorithm for its own site only; there is no inter-device communication.
+**EMS (production):** Berry scripts packaged as a `.tapp` deployed on Tasmota ESP32 firmware. The device ships only a tiny `index.html` shell; the Vite-built JS/CSS bundle and the `lang.json` dictionary are served from a CDN (GitHub Pages, gplug-ch/gplug-cdn), versioned by `VERSION.txt`. A self-host mode (`make build-self`) packs the assets back into the `.tapp` for offline/restricted networks. Each device is standalone: it runs the allocation algorithm for its own site only; there is no inter-device communication.
 
 **Simulator:** Spring Boot backend + React frontend running on a PC/server. Mirrors the EMS domain model for testing and demonstration without physical devices.
 
@@ -112,4 +117,4 @@ every data write is an append.
 
 ### Build output
 
-`make` in `ems/backend/` produces `build/ems-v<VERSION>.tapp` — a zip (no compression) containing minified Berry sources and the Vite-built `index.html` shell. The Makefile runs the Vite build (`ems/frontend`, which bakes the versioned CDN URLs into `index.html`) and always runs `bundle.py --lang-only` for the i18n completeness check. In CDN mode the JS/CSS **and `lang.json`** live on GitHub Pages (gplug-cdn repo), not in the `.tapp` (the ~23 KB dictionary would be a quarter of the package for a fallback nobody can reach — a dead CDN takes the JS bundle with it); the device reads its build language from `<html lang>` in the shell instead. `make ASSET_BASE=self` packs the hashed assets *and* `lang.json` into the `.tapp` and points the shell at `/fs?name=`.
+`make` at the repo root produces `build/ems-v<VERSION>.tapp` — a zip (no compression) containing minified Berry sources and the Vite-built `index.html` shell. The Makefile runs the Vite build (`ems/frontend`, which bakes the versioned CDN URLs into `index.html`) and always runs `bundle.py --lang-only` for the i18n completeness check. In CDN mode the JS/CSS **and `lang.json`** live on GitHub Pages (gplug-cdn repo), not in the `.tapp` (the ~23 KB dictionary would be a quarter of the package for a fallback nobody can reach — a dead CDN takes the JS bundle with it); the device reads its build language from `<html lang>` in the shell instead. `make build-self` packs the hashed assets *and* `lang.json` into the `.tapp` and points the shell at `/fs?name=`.
