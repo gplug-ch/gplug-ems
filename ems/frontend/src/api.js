@@ -91,6 +91,12 @@ function base() {
         .then(function (r) {
           /* any HTTP answer means the device is reachable */
           markReached();
+          if (!r.ok && opts.errorBody) {
+            /* surface the server's {"error": …} text instead of the status */
+            return r.json().catch(function () { return null; }).then(function (d) {
+              throw new Error((d && d.error) || ('HTTP ' + r.status + ' ' + path));
+            });
+          }
           if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + path);
           return opts.text ? r.text() : r.json();
         })
@@ -235,6 +241,11 @@ export const api = {
        behind a Modbus TCP gateway. Each entry carries its own config
        (friendlyName/register/unitLabel/...) plus the live "currentPower". */
     getModbus: function () { return get('/api/modbus'); },
+    /* manual register read/write (issue #20, Einstellungen Modbus test
+       panel): `query` from modbusReadQuery(), `body` from modbusWriteBody().
+       Writes are POST only — no GET ever changes a register. */
+    modbusRead: function (query) { return get('/api/modbus/read?' + query, { errorBody: true }); },
+    modbusWrite: function (body) { return post('/api/modbus/write', body); },
     setLoadState: function (id, state) {
       return get('/loads?id=' + encodeURIComponent(id) + '&action=transition&to=' + encodeURIComponent(state));
     },

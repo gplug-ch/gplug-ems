@@ -110,6 +110,7 @@ nothing rather than to a stale line.
 | `GET /api/meta` | `{time, tariffs}` (spec 011 step 1 dropped `version`/`language`) |
 | `GET /api/meter` | Raw smart-meter descriptor `{now, values}` (spec 007); browser interprets it via `lib/metercat.js` |
 | `GET /api/modbus` | Standalone Modbus registers (site.json `modbusRegisters`, configured in Einstellungen → Modbus) — array of items (config fields + live `currentPower`), streamed like `/loads`/`/productions`. Rendered as a raw table in `pages/modbus.js`, same table styling as the Zähler «Rohdaten» section; nav entry gated on the list being non-empty (mirrors the `meter` gate) |
+| `GET /api/modbus/read?…` / `POST /api/modbus/write` | Manual Modbus register read/write (issue #20) — the Einstellungen «Modbus» tab's test panel (`ModbusTestPanel`; pure helpers `modbusTargets`/`modbusReadQuery`/`modbusWriteBody`/`modbusTestErrors`). Writing needs an in-page confirmation. `api.modbusRead` passes `errorBody` so the device's `{error}` text surfaces |
 | `GET /api/config` / `POST /api/config` | Read / replace `site.json` (Einstellungen; field validation is browser-side, the device only rejects non-objects (400) or an unloadable doc (500 + rollback)) |
 | `GET /fs?name=<file>` | Serve a file from the Tasmota filesystem (`/app` redirects to `/fs?name=index.html`) |
 | `GET /cm?cmnd=<cmd>` | Tasmota command API (Einstellungen «gPlug» tab: restart, WLAN) |

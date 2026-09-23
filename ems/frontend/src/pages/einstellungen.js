@@ -608,10 +608,89 @@ import * as archive from '../lib/archive.js';
     return out;
   }
 
+  /* ---------- Modbus test panel: pure helpers (issue #20) ---------- */
+
+  /* item key holding the register of each readable field */
+  var MODBUS_TEST_FIELDS = { power: 'register', soc: 'soc_register', energy: 'energy_register',
+    state: 'state_register' };
+
+  /* Every register of every configured modbustcp item the panel can target:
+     [{id, name, field, register, writable}]. Only holding registers
+     (function 3) are writable, plus a load's "write" register. */
+  function modbusTargets(cfg) {
+    var out = [];
+    ['loads', 'productions', 'grid', 'modbusRegisters'].forEach(function (k) {
+      var list = cfg && Array.isArray(cfg[k]) ? cfg[k] : [];
+      list.forEach(function (it) {
+        if (!isObj(it) || it.integration !== 'modbustcp' || isBlank(it.id)) return;
+        var name = it.friendlyName || String(it.id);
+        var func = Number(it.function || 3);
+        Object.keys(MODBUS_TEST_FIELDS).forEach(function (f) {
+          var reg = it[MODBUS_TEST_FIELDS[f]];
+          if (isBlank(reg)) return;
+          var ff = f === 'power' ? func : Number(it[f + '_function'] || func);
+          out.push({ id: String(it.id), name: name, field: f, register: Number(reg), writable: ff === 3 });
+        });
+        if (isObj(it.write) && !isBlank(it.write.register)) {
+          out.push({ id: String(it.id), name: name, field: 'write', register: Number(it.write.register),
+            writable: true });
+        }
+      });
+    });
+    return out;
+  }
+
+  /* form errors of the free-parameter mode (+ the value, when writing) */
+  function modbusTestErrors(p, writing) {
+    var e = {};
+    if (p.mode === 'free') {
+      if (!isHostPort(p.url)) e.url = 'settings.err.modbus_url';
+      if (!isPosInt(p.register, 0, 65535)) e.register = 'settings.err.modbus_register';
+      if (!isBlank(p.unit) && !isPosInt(p.unit, 0, 255)) e.unit = 'settings.err.modbus_unit';
+      if (badScale(p.scale)) e.scale = 'settings.err.modbus_scale';
+    }
+    if (writing && !isNum(p.value)) e.value = 'settings.err.modbus_value';
+    return e;
+  }
+
+  /* query string of GET /api/modbus/read for panel state `p` */
+  function modbusReadQuery(p, target) {
+    var q = [];
+    function add(k, v) { if (!isBlank(v)) q.push(k + '=' + encodeURIComponent(String(v).trim())); }
+    if (p.mode === 'item') {
+      add('id', target.id);
+      add('field', target.field);
+    } else {
+      add('url', p.url);
+      add('unit', p.unit);
+      add('function', p.function || 3);
+      add('register', p.register);
+      add('dtype', p.dtype || 'float32');
+      if (p.swap_words === true) add('swap_words', 'true');
+      if (!isBlank(p.scale) && Number(p.scale) !== 1) add('scale', p.scale);
+      if (p.dimension === 'kW') add('dimension', 'kW');
+    }
+    return q.join('&');
+  }
+
+  /* JSON body of POST /api/modbus/write for panel state `p` */
+  function modbusWriteBody(p, target) {
+    if (p.mode === 'item') return { id: target.id, field: target.field, value: Number(p.value) };
+    var b = { url: String(p.url).trim(), register: Number(p.register), dtype: p.dtype || 'float32',
+      value: Number(p.value) };
+    if (!isBlank(p.unit)) b.unit = Number(p.unit);
+    if (p.swap_words === true) b.swap_words = true;
+    if (!isBlank(p.scale) && Number(p.scale) !== 1) b.scale = Number(p.scale);
+    if (p.dimension === 'kW') b.dimension = 'kW';
+    if (!isBlank(p.wfunction)) b.function = Number(p.wfunction);
+    return b;
+  }
+
 export {
   validateLoad, validateProduction, validateGrid, validateSite,
   validateTariffs, validateDocument, hasErrors, isUrl, dropBlankGplugKeys,
   validateModbusReg, dropBlankModbusKeys,
+  modbusTargets, modbusTestErrors, modbusReadQuery, modbusWriteBody,
 };
 
   /* ---------- small field helpers with inline error support ---------- */
@@ -798,6 +877,129 @@ export {
         placeholder="0" error=${errors['write.off']} onInput=${setWrite('off')} />
       <${Field} label=${t('settings.modbus.write_inactive')} type="number" step="any" value=${w.inactive}
         error=${errors['write.inactive']} onInput=${setWrite('inactive')} />`;
+  }
+
+  /* ---------- Modbus tab: register test panel (issue #20) ---------- */
+
+  /* standard Modbus exception names (codes 1-4, 0x0A, 0x0B) */
+  var MODBUS_EXC = { 1: 'Illegal function', 2: 'Illegal data address', 3: 'Illegal data value',
+    4: 'Server device failure', 10: 'Gateway path unavailable', 11: 'Gateway target failed to respond' };
+
+  function hexWord(w) { return '0x' + ('0000' + Number(w).toString(16).toUpperCase()).slice(-4); }
+
+  /* Read or write one register directly on the device, for commissioning:
+     a configured item's register (as the device has it SAVED) or free
+     parameters. Writing needs an explicit confirmation step. */
+  function ModbusTestPanel(props) {
+    var targets = modbusTargets(props.cfg);
+    var [p, setP] = useState({ mode: targets.length ? 'item' : 'free', target: 0, url: '', unit: '',
+      function: '3', register: '', dtype: 'float32', swap_words: false, scale: '', dimension: 'W',
+      wfunction: '', value: '' });
+    var [busy, setBusy] = useState(false);
+    var [confirming, setConfirming] = useState(false);
+    var [result, setResult] = useState(null);
+
+    function set(k) {
+      return function (v) {
+        var n = Object.assign({}, p);
+        n[k] = v;
+        setP(n);
+        setConfirming(false);
+      };
+    }
+    var target = targets[Number(p.target)] || targets[0];
+    var itemMode = p.mode === 'item' && !!target;
+    var mode = itemMode ? 'item' : 'free';
+    var q = Object.assign({}, p, { mode: mode });
+    var readErr = modbusTestErrors(q, false);
+    var writeErr = modbusTestErrors(q, true);
+    var canWrite = itemMode ? target.writable : true;
+    var regLabel = itemMode ? String(target.register) : String(p.register);
+
+    function done(r, kind) { setResult(Object.assign({ kind: kind }, r || {})); }
+    function fail(e) { setResult({ error: (e && e.message) || String(e) }); }
+    function doRead() {
+      setBusy(true);
+      setConfirming(false);
+      api.modbusRead(modbusReadQuery(q, target))
+        .then(function (r) { done(r, 'read'); }, fail)
+        .then(function () { setBusy(false); });
+    }
+    function doWrite() {
+      setBusy(true);
+      setConfirming(false);
+      api.modbusWrite(modbusWriteBody(q, target))
+        .then(function (r) { done(r, 'write'); }, fail)
+        .then(function () { setBusy(false); });
+    }
+
+    var modes = [{ value: 'item', label: t('settings.modbus.test.mode_item') },
+      { value: 'free', label: t('settings.modbus.test.mode_free') }];
+    return html`
+      <${ui.Card} group="grid" title=${t('settings.modbus.test.title')}>
+        <p class="settings-scope">${t('settings.modbus.test.hint')}</p>
+        <div class="settings-form">
+          ${targets.length ? html`
+            <${SelectField} label=${t('settings.modbus.test.mode')} value=${mode}
+              options=${modes} onChange=${set('mode')} />` : html`
+            <div class="settings-warn" role="status">${t('settings.modbus.test.no_targets')}</div>`}
+          ${itemMode ? html`
+            <${SelectField} label=${t('settings.modbus.test.target')} value=${String(p.target)}
+              options=${targets.map(function (x, i) {
+                return { value: String(i), label: x.name + ' · ' + t('settings.modbus.test.field.' + x.field) +
+                  ' · ' + x.register };
+              })}
+              onChange=${set('target')} />` : html`
+            <${Field} label=${t('settings.modbus.url')} value=${p.url} placeholder="192.168.0.102:502"
+              error=${readErr.url} onInput=${set('url')} />
+            <${Field} label=${t('settings.modbus.unit')} type="number" step="1" min="0" value=${p.unit}
+              placeholder="1" error=${readErr.unit} onInput=${set('unit')} />
+            <${SelectField} label=${t('settings.modbus.function')} value=${String(p.function)}
+              options=${MODBUS_FUNCTIONS} onChange=${set('function')} />
+            <${Field} label=${t('settings.modbus.register')} type="number" step="1" min="0"
+              value=${p.register} error=${readErr.register} onInput=${set('register')} />
+            <${SelectField} label=${t('settings.modbus.dtype')} value=${p.dtype}
+              options=${opt(MODBUS_DTYPES)} onChange=${set('dtype')} />
+            <${Field} label=${t('settings.modbus.scale')} type="number" step="any" value=${p.scale}
+              placeholder="1" error=${readErr.scale} onInput=${set('scale')} />
+            <${SelectField} label=${t('settings.dimension')} value=${p.dimension}
+              options=${opt(DIMENSIONS)} onChange=${set('dimension')} />
+            <${SelectField} label=${t('settings.modbus.write_function')} value=${p.wfunction}
+              options=${[{ value: '', label: t('settings.modbus.write_function_auto') }].concat(MODBUS_WRITE_FUNCTIONS.slice(0, 2))}
+              onChange=${set('wfunction')} />
+            <label class="toggle-wrap">
+              <input type="checkbox" class="toggle" checked=${p.swap_words === true}
+                onChange=${function (e) { set('swap_words')(e.target.checked); }} />
+              <span>${t('settings.modbus.swap_words')}</span>
+            </label>`}
+          <${Field} label=${t('settings.modbus.test.value')} type="number" step="any" value=${p.value}
+            disabled=${!canWrite} error=${p.value !== '' ? writeErr.value : null} onInput=${set('value')} />
+        </div>
+        ${!canWrite ? html`<p class="settings-scope">${t('settings.modbus.test.readonly')}</p>` : null}
+        ${confirming ? html`
+          <div class="settings-warn" role="alert">
+            ${t('settings.modbus.test.confirm', { value: p.value, register: regLabel,
+              target: itemMode ? target.name : String(p.url) })}
+          </div>` : null}
+        <div class="settings-actions">
+          ${confirming ? html`
+            <${ui.Button} secondary onClick=${function () { setConfirming(false); }}>${t('settings.modbus.test.cancel')}<//>
+            <${ui.Button} danger disabled=${busy} onClick=${doWrite}>${t('settings.modbus.test.confirm_yes')}<//>` : html`
+            <${ui.Button} secondary disabled=${busy || !canWrite || hasErrors(writeErr)}
+              onClick=${function () { setConfirming(true); }}>${t('settings.modbus.test.write')}<//>
+            <${ui.Button} disabled=${busy || hasErrors(readErr)} onClick=${doRead}>${t('settings.modbus.test.read')}<//>`}
+        </div>
+        ${result ? html`
+          <div class="modbus-test-result" role="status">
+            ${result.error ? html`<span class="field-error">${result.error}</span>`
+              : result.exception !== undefined ? html`<span class="field-error">${t('settings.modbus.test.exception',
+                  { code: result.exception, name: MODBUS_EXC[result.exception] || '?' })}</span>`
+              : html`
+                ${result.kind === 'write' ? html`<div>${t('settings.modbus.test.written')}</div>` : null}
+                ${result.value !== undefined ? html`<div>${t('settings.modbus.test.result_value')}: <strong>${String(result.value)}</strong></div>` : null}
+                ${Array.isArray(result.raw) ? html`<div>${t('settings.modbus.test.result_raw')}: <code>${result.raw.map(hexWord).join(' ')}</code></div>` : null}`}
+          </div>` : null}
+      <//>`;
   }
 
   /* ---------- Loads tab ---------- */
@@ -1754,7 +1956,8 @@ export {
         blank=${blankModbusReg} confirmKey="settings.confirm_delete_load"
         persistedIds=${persistedIds.modbusRegisters}
         validate=${validateModbusReg} Detail=${ModbusRegDetail}
-        onSave=${save} saving=${saving} />`;
+        onSave=${save} saving=${saving} />
+        <${ModbusTestPanel} cfg=${cfg} />`;
     }
 
     return html`

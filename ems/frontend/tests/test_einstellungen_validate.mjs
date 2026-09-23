@@ -8,7 +8,8 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { validateDocument, validateLoad, validateProduction, validateGrid,
-  validateModbusReg, dropBlankModbusKeys } from '../src/pages/einstellungen.js';
+  validateModbusReg, dropBlankModbusKeys, modbusTargets, modbusTestErrors, modbusReadQuery,
+  modbusWriteBody } from '../src/pages/einstellungen.js';
 
 /* a document the old device validator accepted */
 function valid() {
@@ -377,4 +378,44 @@ test('dropBlankModbusKeys: extra registers and the write block', () => {
   assert.strictEqual(pv.energy_register, 120);
   assert.strictEqual(pv.energy_scale, 0.01);
   assert.strictEqual('energy_dimension' in pv, false);
+});
+
+/* ---------- Modbus test panel helpers (issue #20) ---------- */
+
+test('modbusTargets lists every register of the modbustcp items, holding ones writable', () => {
+  const p = fileURLToPath(new URL('../../backend/examples/site-sim-modbus.json', import.meta.url));
+  const cfg = JSON.parse(readFileSync(p, 'utf8'));
+  const ts = modbusTargets(cfg);
+  const key = x => x.id + ':' + x.field;
+  const byKey = Object.fromEntries(ts.map(x => [key(x), x]));
+  assert.strictEqual(byKey['battery-1:power'].register, 200);
+  assert.strictEqual(byKey['battery-1:power'].writable, false);       /* input register */
+  assert.strictEqual(byKey['battery-1:soc'].register, 201);
+  assert.strictEqual(byKey['boiler-1:state'].register, 1100);
+  assert.strictEqual(byKey['boiler-1:write'].writable, true);
+  assert.strictEqual(byKey['static-float:power'].writable, true);     /* holding register */
+  assert.ok(!ts.some(x => x.id === 'from' && x.field === 'write'));
+  assert.deepStrictEqual(modbusTargets({ loads: [{ id: 'x', integration: 'shelly' }] }), []);
+});
+
+test('modbusTestErrors: free parameters and the value', () => {
+  const ok = { mode: 'free', url: '10.0.0.1:502', register: '1000', unit: '', scale: '', value: '' };
+  assert.deepStrictEqual(modbusTestErrors(ok, false), {});
+  assert.strictEqual(modbusTestErrors(ok, true).value, 'settings.err.modbus_value');
+  const bad = modbusTestErrors({ mode: 'free', url: 'http://x', register: '70000', unit: '300', scale: '0' }, false);
+  assert.deepStrictEqual(Object.keys(bad).sort(), ['register', 'scale', 'unit', 'url']);
+  assert.deepStrictEqual(modbusTestErrors({ mode: 'item', value: '2' }, true), {});
+});
+
+test('modbusReadQuery / modbusWriteBody build the device requests', () => {
+  const target = { id: 'boiler-1', field: 'write' };
+  assert.strictEqual(modbusReadQuery({ mode: 'item' }, target), 'id=boiler-1&field=write');
+  assert.deepStrictEqual(modbusWriteBody({ mode: 'item', value: '2' }, target),
+    { id: 'boiler-1', field: 'write', value: 2 });
+  const free = { mode: 'free', url: ' 10.0.0.1:5020 ', unit: '2', function: '4', register: '108',
+    dtype: 'float32', swap_words: true, scale: '1', dimension: 'kW', wfunction: '16', value: '1.5' };
+  assert.strictEqual(modbusReadQuery(free),
+    'url=10.0.0.1%3A5020&unit=2&function=4&register=108&dtype=float32&swap_words=true&dimension=kW');
+  assert.deepStrictEqual(modbusWriteBody(free), { url: '10.0.0.1:5020', register: 108, dtype: 'float32',
+    value: 1.5, unit: 2, swap_words: true, dimension: 'kW', function: 16 });
 });

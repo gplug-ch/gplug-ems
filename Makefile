@@ -60,7 +60,7 @@ endif
 .DEFAULT_GOAL := build
 .PHONY: build build-dev dev test test-backend test-frontend \
 	release deploy-cdn flash sim-run sim-test sim-ui clean help \
-	minify frontend tapp guard-release
+	minify frontend tapp guard-release lang lang-check
 
 # =============================================================================
 # BUILD
@@ -103,8 +103,30 @@ frontend:
 	python3 $(FRONTEND_DIR)/bundle.py --lang-only --quiet \
 		--lang $(UILANG) --langout $(BUILD_DIR)/.lang-check.json \
 		&& rm -f $(BUILD_DIR)/.lang-check.json
+	@$(MAKE) --no-print-directory lang-check
 	cp $(FRONTEND_DIST)/index.html $(BUILD_DIR)/index.html
 	@cp VERSION.txt $(BUILD_DIR)/VERSION.txt
+
+# The tracked ems/frontend/lang.json is the German dictionary the Vite dev
+# server serves (`make dev`); nothing else rewrites it, so it silently fell
+# behind i18n/de.json whenever a key was added. lang-check (part of every
+# build) fails when it differs from a fresh bundle.py run; `make lang`
+# regenerates it.
+lang-check: ## Fail if ems/frontend/lang.json is out of date (fix: make lang)
+	@mkdir -p $(BUILD_DIR)
+	@python3 $(FRONTEND_DIR)/bundle.py --lang-only --quiet --lang de \
+		--langout $(BUILD_DIR)/.lang-de.json
+	@if cmp -s $(BUILD_DIR)/.lang-de.json $(FRONTEND_DIR)/lang.json; then \
+		rm -f $(BUILD_DIR)/.lang-de.json; \
+	else \
+		rm -f $(BUILD_DIR)/.lang-de.json; \
+		echo "ERROR: ems/frontend/lang.json is out of date with i18n/de.json — run 'make lang' and commit it" >&2; \
+		exit 1; \
+	fi
+
+lang: ## Regenerate ems/frontend/lang.json (dev-server dictionary) from i18n/de.json
+	python3 $(FRONTEND_DIR)/bundle.py --lang-only --quiet --lang de \
+		--langout $(FRONTEND_DIR)/lang.json
 
 tapp: minify frontend
 	@echo "Building TAPP file: $(TAPP)"
