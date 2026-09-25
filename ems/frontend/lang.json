@@ -314,6 +314,8 @@
 "settings.modbus.test.cancel": "Abbrechen",
 "settings.modbus.test.confirm": "Wert {value} in Register {register} ({target}) schreiben?",
 "settings.modbus.test.confirm_yes": "Ja, schreiben",
+"settings.modbus.test.err_connect": "Keine Verbindung: das Gerät hat innerhalb von {ms} ms nicht geantwortet. Adresse, Port und Netzwerk prüfen.",
+"settings.modbus.test.err_timeout": "Verbunden, aber keine Antwort innerhalb von {ms} ms. Unit-ID prüfen; ein langsames Gateway (z. B. M-Bus) antwortet evtl. nur der regulären Abfrage, die länger wartet.",
 "settings.modbus.test.exception": "Modbus-Exception {code} ({name})",
 "settings.modbus.test.field.energy": "Energiezähler",
 "settings.modbus.test.field.power": "Leistung",

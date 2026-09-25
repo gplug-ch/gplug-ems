@@ -19,7 +19,9 @@ import math
 var _mb = compile('mbslave.be', 'file')()
 
 import tasmota
-tasmota.delay = def(ms) end
+# no real sleeping; `slept` sums what the read loop asked for (issue #30)
+var slept = 0
+tasmota.delay = def(ms) slept += ms end
 import modbustcp
 
 var passed = 0
@@ -36,6 +38,7 @@ def reset()
     _mb['connects'] = 0
     _mb['mute'] = false
     _mb['bad_echo'] = false
+    _mb['refuse'] = false
 end
 
 # request frame without its (running) transaction id
@@ -141,6 +144,36 @@ _mb['mute'] = true
 res = modbustcp.write_register(URL, {'register': 1000, 'dtype': 'uint16'}, 1)
 check(res.contains('error'), f"no reply must fail, got {res}")
 print("Test 6 passed: exception, non-echo and silent replies")
+
+# --- read budget: manual ops wait less, and say why they failed (issue #30) -----
+# 1500 / 3000 / 1000 = MANUAL_READ_BUDGET_MS / READ_BUDGET_MS / CONNECT_TIMEOUT_MS
+
+reset()
+_mb['mute'] = true
+slept = 0
+res = modbustcp.read_register(URL, {'register': 5, 'dtype': 'uint16', 'manual': true})
+check(res.find('reason', nil) == 'timeout' && res['ms'] == 1500,
+      f"silent host on a manual read -> reason timeout, got {res}")
+check(res['error'] == f"no response within 1500 ms", f"timeout text, got {res}")
+check(slept == 1500, f"manual read waits the manual budget, slept {slept}")
+slept = 0
+res = modbustcp.write_register(URL, {'register': 5, 'dtype': 'uint16', 'manual': true}, 1)
+check(res.find('reason', nil) == 'timeout', f"silent host on a manual write -> reason timeout, got {res}")
+check(slept == 1500, f"manual write waits the manual budget, slept {slept}")
+slept = 0
+check(modbustcp.fetch_item(URL, nil, {'register': 5}) == nil, "silent host on a poll -> nil")
+check(slept == 3000, f"the poll keeps the long budget, slept {slept}")
+
+reset()
+_mb['refuse'] = true
+res = modbustcp.read_register(URL, {'register': 5, 'manual': true})
+check(res.find('reason', nil) == 'connect' && res['ms'] == 1000,
+      f"refused connect -> reason connect, got {res}")
+res = modbustcp.write_register(URL, {'register': 5, 'dtype': 'uint16', 'manual': true}, 1)
+check(res.find('reason', nil) == 'connect', f"refused connect on write -> reason connect, got {res}")
+res = modbustcp.read_register('bad', {'register': 5, 'manual': true})
+check(!res.contains('reason'), f"a bad url is no transport failure, got {res}")
+print("Test 6b passed: manual read budget and typed transport errors")
 
 # --- fetch_item: extra registers over one connection -----------------------------
 

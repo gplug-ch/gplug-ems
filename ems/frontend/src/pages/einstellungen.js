@@ -917,7 +917,15 @@ export {
     var regLabel = itemMode ? String(target.register) : String(p.register);
 
     function done(r, kind) { setResult(Object.assign({ kind: kind }, r || {})); }
-    function fail(e) { setResult({ error: (e && e.message) || String(e) }); }
+    /* a transport failure the device classified (issue #30): "connect" = no
+       TCP connection, "timeout" = connected but silent within `ms` */
+    function fail(e) {
+      var b = (e && e.body) || {};
+      var msg = (e && e.message) || String(e);
+      if (b.reason === 'connect') msg = t('settings.modbus.test.err_connect', { ms: b.ms });
+      else if (b.reason === 'timeout') msg = t('settings.modbus.test.err_timeout', { ms: b.ms });
+      setResult({ error: msg });
+    }
     function doRead() {
       setBusy(true);
       setConfirming(false);

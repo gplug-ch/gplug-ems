@@ -67,6 +67,19 @@ var CONNECT_TIMEOUT_MS = 1000
 var READ_BUDGET_MS = 3000
 var READ_POLL_MS = 20
 
+# Read budget for a MANUAL op (Einstellungen «Modbus» test panel, issue #30).
+# The exchange runs inside the HTTP handler on the shared Berry thread, so
+# the whole device (EMS tick, Übersicht polls, meter sampling) waits with it;
+# and a manual op skips the host backoff, so every click pays the full wait.
+# Half the poll budget still covers a native device by orders of magnitude;
+# a gateway that needs longer answers the background poll, not the panel.
+var MANUAL_READ_BUDGET_MS = 1500
+
+# _transact's transport error when nothing at all came back within the read
+# budget — the host accepted the connection but did not answer. read_register
+# / write_register report it with "reason":"timeout" (vs. "connect").
+var NO_RESPONSE = "no response"
+
 # MBAP header (7: transaction, protocol, length, unit) + function byte (1) +
 # one more byte is the minimum needed to tell success from a Modbus
 # exception apart: a full exception reply is exactly 9 bytes (header + func
@@ -131,11 +144,11 @@ end
 # consecutive empty polls (a quiet period) end the wait early instead of
 # always burning the full budget; a socket that never answers at all still
 # times out at READ_BUDGET_MS.
-def _read_response(tc)
+def _read_response(tc, budget)
     var resp = bytes()
     var waited = 0
     var idle = 0
-    while waited < READ_BUDGET_MS
+    while waited < budget
         var chunk = tc.readbytes()
         if chunk != nil && chunk.size() > 0
             resp = resp .. chunk
@@ -153,12 +166,15 @@ def _read_response(tc)
 end
 
 # One request/reply exchange. Returns [resp, nil] on success, or [nil, err]
-# where err is the Modbus exception code (int) or a transport error (string).
-def _transact(tc, req, func)
+# where err is the Modbus exception code (int) or a transport error (string,
+# NO_RESPONSE when nothing came back within `budget` ms, default
+# READ_BUDGET_MS).
+def _transact(tc, req, func, budget)
     tc.write(req)
-    var resp = _read_response(tc)
-    if resp == nil || resp.size() < HEADER_MIN_SIZE
-        return [nil, "no/short response"]
+    var resp = _read_response(tc, budget != nil ? budget : READ_BUDGET_MS)
+    if resp == nil return [nil, NO_RESPONSE] end
+    if resp.size() < HEADER_MIN_SIZE
+        return [nil, "short response"]
     end
     var rf = resp.get(7, 1)
     if rf == (func | 0x80)
@@ -265,7 +281,7 @@ end
 
 # Open a connection to "<ip>:<port>". Returns [tc, nil], or [nil, reason] if
 # the host is in its cool-off window, the url is malformed or the connect
-# fails (logged, backoff noted). A MANUAL op (`manual` true) ignores the
+# fails (logged, backoff noted); a failed connect returns [nil, reason, true]. A MANUAL op (`manual` true) ignores the
 # cool-off: the user asked for exactly this one exchange, and answering
 # "connect failed" for a host nobody even tried was the panel's 502 mystery.
 def _connect(url, manual)
@@ -282,7 +298,7 @@ def _connect(url, manual)
         logger.logMsg(logger.lWarn, f"modbustcp: connect '{url}' failed")
         _fail(url, manual)
         tc.close()
-        return [nil, f"connect to {url} failed (no answer within {CONNECT_TIMEOUT_MS} ms)"]
+        return [nil, f"connect to {url} failed (no answer within {CONNECT_TIMEOUT_MS} ms)", true]
     end
     return [tc, nil]
 end
@@ -290,9 +306,9 @@ end
 # Read ONE register (pair) on an open connection. Returns [value, data] —
 # the decoded (unscaled) value and the register bytes after any word swap —
 # or [nil, err] as _transact.
-def _read_one(tc, unit, func, reg, dtype, swap)
+def _read_one(tc, unit, func, reg, dtype, swap, budget)
     var qty = _qty(dtype)
-    var r = _transact(tc, _build_request(_next_trans_id(), unit, func, reg, qty), func)
+    var r = _transact(tc, _build_request(_next_trans_id(), unit, func, reg, qty), func, budget)
     if r[0] == nil return r end
     var resp = r[0]
     var byte_count = resp.get(8, 1)
@@ -412,21 +428,38 @@ def fetch_item(url, token, cfg)
     end
 end
 
+# Error map for read_register / write_register: {"error"} plus, for the two
+# transport failures the panel explains to the user (issue #30), "reason"
+# ("connect" | "timeout") and "ms", the budget that ran out.
+def _transport_err(msg, reason, ms)
+    return {"error": msg, "reason": reason, "ms": ms}
+end
+
+# Read budget of a spec: manual ops get the short one (see MANUAL_READ_BUDGET_MS)
+def _budget(manual)
+    return manual ? MANUAL_READ_BUDGET_MS : READ_BUDGET_MS
+end
+
 # Read one register by an explicit spec {unit, function, register, dtype,
 # swap_words, scale, dimension, manual} — the manual read (issue #20).
 # Returns {"value", "raw": [words]}, {"exception": code} or {"error": msg}.
-# "manual": true bypasses the host backoff (see _connect).
+# "manual": true bypasses the host backoff (see _connect) and waits at most
+# MANUAL_READ_BUDGET_MS for the reply. A failed connect or a silent host adds
+# "reason"/"ms" (see _transport_err).
 def read_register(url, spec)
     var reg = spec.find("register", nil)
     if reg == nil return {"error": "no register"} end
     var manual = spec.find("manual", false)
+    var budget = _budget(manual)
     var tc = nil
     try
         var c = _connect(url, manual)
         tc = c[0]
-        if tc == nil return {"error": c[1]} end
+        if tc == nil
+            return size(c) > 2 ? _transport_err(c[1], "connect", CONNECT_TIMEOUT_MS) : {"error": c[1]}
+        end
         var r = _read_one(tc, spec.find("unit", 1), spec.find("function", 3), reg,
-                          spec.find("dtype", "float32"), spec.find("swap_words", false))
+                          spec.find("dtype", "float32"), spec.find("swap_words", false), budget)
         tc.close()
         if r[0] == nil
             _log_err(url, reg, r[1])
@@ -435,6 +468,9 @@ def read_register(url, spec)
                 return {"exception": r[1]}
             end
             _fail(url, manual)
+            if r[1] == NO_RESPONSE
+                return _transport_err(f"no response within {budget} ms", "timeout", budget)
+            end
             return {"error": r[1]}
         end
         nethost.ok(url)
@@ -453,7 +489,7 @@ end
 # read_register plus "function" 6|16|5 (default by dtype). The reply must
 # echo the request. Returns {"ok": true, "function", "raw": [words]},
 # {"exception": code} or {"error": msg}. Every write is logged. "manual":
-# true bypasses the host backoff (see _connect).
+# true bypasses the host backoff and shortens the wait, as for read_register.
 def write_register(url, spec, value)
     var reg = spec.find("register", nil)
     if reg == nil return {"error": "no register"} end
@@ -493,12 +529,15 @@ def write_register(url, spec, value)
     end
     logger.logMsg(logger.lInfo, f"modbustcp: write '{url}' unit {unit} reg {reg} FC {func} value {value}")
     var manual = spec.find("manual", false)
+    var budget = _budget(manual)
     var tc = nil
     try
         var c = _connect(url, manual)
         tc = c[0]
-        if tc == nil return {"error": c[1]} end
-        var r = _transact(tc, req, func)
+        if tc == nil
+            return size(c) > 2 ? _transport_err(c[1], "connect", CONNECT_TIMEOUT_MS) : {"error": c[1]}
+        end
+        var r = _transact(tc, req, func, budget)
         tc.close()
         if r[0] == nil
             _log_err(url, reg, r[1])
@@ -507,6 +546,9 @@ def write_register(url, spec, value)
                 return {"exception": r[1]}
             end
             _fail(url, manual)
+            if r[1] == NO_RESPONSE
+                return _transport_err(f"no response within {budget} ms", "timeout", budget)
+            end
             return {"error": r[1]}
         end
         # FC 5/6 echo the whole request PDU; FC 16 echoes address + quantity

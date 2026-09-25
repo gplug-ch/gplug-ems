@@ -4,9 +4,9 @@
 
 # A tiny in-memory Modbus TCP slave behind the tcpclient stub: one shared
 # 16-bit register space (holding and input alike), coils, per-address
-# exception codes, and knobs for a silent or non-echoing device.
+# exception codes, and knobs for a silent, non-echoing or unreachable device.
 var _mb = {'regs': {}, 'coils': {}, 'exc': {}, 'pending': nil, 'connects': 0,
-           'frames': [], 'mute': false, 'bad_echo': false}
+           'frames': [], 'mute': false, 'bad_echo': false, 'refuse': false}
 
 def _hdr(tid, unit, len)
     var b = bytes()
@@ -59,7 +59,7 @@ end
 class _TcpClientStub
     def connect(host, port, timeout_ms)
         _mb['connects'] = _mb['connects'] + 1
-        return true
+        return !_mb['refuse']
     end
     def connected() return true end
     def close() end

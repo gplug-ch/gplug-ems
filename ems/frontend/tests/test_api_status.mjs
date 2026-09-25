@@ -112,3 +112,13 @@ test('requests are capped at 2 in flight (single-threaded device)', async () => 
   assert.strictEqual(peak, 2);
   await reset();
 });
+
+test('a 502 keeps the server body on the error (Modbus reason, issue #30)', async () => {
+  await reset();
+  const body = { error: 'no response within 1500 ms', reason: 'timeout', ms: 1500 };
+  responder = async () => new Response(JSON.stringify(body), { status: 502 });
+  await assert.rejects(api.modbusRead('register=5'), (e) =>
+    e.message === body.error && e.body.reason === 'timeout' && e.body.ms === 1500);
+  await assert.rejects(api.modbusWrite({ register: 5, value: 1 }), (e) =>
+    e.message === body.error && e.body.reason === 'timeout');
+});

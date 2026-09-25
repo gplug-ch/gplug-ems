@@ -163,7 +163,9 @@ check(r[0] == 200, "manual write ignores the backoff")
 reset()
 _mb['mute'] = true
 r = modbusservice.read({'url': U, 'register': '5', 'dtype': 'uint16'})
-check(r[0] == 502 && json.load(r[1])['error'] == 'no/short response', f"silent device -> 502, got {r}")
+var body = json.load(r[1])
+check(r[0] == 502 && body['reason'] == 'timeout' && body['ms'] == 1500,
+      f"silent device -> 502 + reason timeout, got {r}")
 check(!nethost.skipping(U), "a manual failure does not put the host in backoff")
 r = modbusservice.read({'url': 'nocolon', 'register': '5'})
 check(r[0] == 400, "malformed url is a 400 before any connect")
