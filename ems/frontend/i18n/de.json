@@ -195,6 +195,8 @@
   "settings.modbus.test.result_value": "Wert",
   "settings.modbus.test.result_raw": "Rohwerte",
   "settings.modbus.test.exception": "Modbus-Exception {code} ({name})",
+  "settings.modbus.test.err_connect": "Keine Verbindung: das Gerät hat innerhalb von {ms} ms nicht geantwortet. Adresse, Port und Netzwerk prüfen.",
+  "settings.modbus.test.err_timeout": "Verbunden, aber keine Antwort innerhalb von {ms} ms. Unit-ID prüfen; ein langsames Gateway (z. B. M-Bus) antwortet evtl. nur der regulären Abfrage, die länger wartet.",
   "settings.err.modbus_url": "Bitte Adresse als IP:Port angeben (kein http/https).",
   "settings.err.modbus_register": "Register muss eine ganze Zahl ≥ 0 sein.",
   "settings.err.modbus_unit": "Unit/Slave-ID muss eine ganze Zahl zwischen 1 und 247 sein.",

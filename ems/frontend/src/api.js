@@ -92,9 +92,12 @@ function base() {
           /* any HTTP answer means the device is reachable */
           markReached();
           if (!r.ok && opts.errorBody) {
-            /* surface the server's {"error": …} text instead of the status */
+            /* surface the server's {"error": …} text instead of the status;
+               the whole body rides along as e.body (e.g. Modbus "reason") */
             return r.json().catch(function () { return null; }).then(function (d) {
-              throw new Error((d && d.error) || ('HTTP ' + r.status + ' ' + path));
+              var err = new Error((d && d.error) || ('HTTP ' + r.status + ' ' + path));
+              err.body = d;
+              throw err;
             });
           }
           if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + path);
@@ -138,7 +141,8 @@ function base() {
   }
 
   /* POST JSON body; returns parsed JSON. Throws Error(message) with the
-     server-supplied error text on non-2xx (spec 006 FR-601 graceful degrade). */
+     server-supplied error text on non-2xx (spec 006 FR-601 graceful degrade);
+     the parsed body rides along as e.body. */
   function post(path, body) {
     return schedule(function () {
       return fetch(base() + path, {
@@ -152,8 +156,9 @@ function base() {
             try { data = txt ? JSON.parse(txt) : null; } catch (e) { /* non-JSON body */ }
             markReached();
             if (!r.ok) {
-              var msg = (data && data.error) || ('HTTP ' + r.status);
-              throw new Error(msg);
+              var err = new Error((data && data.error) || ('HTTP ' + r.status));
+              err.body = data;
+              throw err;
             }
             return data;
           });

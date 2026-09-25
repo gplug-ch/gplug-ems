@@ -195,6 +195,8 @@
   "settings.modbus.test.result_value": "Value",
   "settings.modbus.test.result_raw": "Raw words",
   "settings.modbus.test.exception": "Modbus exception {code} ({name})",
+  "settings.modbus.test.err_connect": "No connection: the device did not answer within {ms} ms. Check address, port and network.",
+  "settings.modbus.test.err_timeout": "Connected, but no reply within {ms} ms. Check the unit ID; a slow gateway (e.g. M-Bus) may only answer the regular poll, which waits longer.",
   "settings.err.modbus_url": "Please enter the address as IP:port (no http/https).",
   "settings.err.modbus_register": "Register must be an integer ≥ 0.",
   "settings.err.modbus_unit": "Unit/slave id must be an integer between 1 and 247.",
