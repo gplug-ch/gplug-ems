@@ -145,9 +145,11 @@ function boot() {
      replaced (vite.config.js) by a single CDN URL (lang.json, or
      lang-<lang>.json for a non-German build), with NO device fallback —
      lang.json is never packed into the .tapp (it cost a quarter of the
-     package), and an unreachable CDN means the JS bundle never loaded either. */
+     package), and an unreachable CDN means the JS bundle never loaded either.
+     @vite-ignore keeps the build from emitting the dev dictionary as an
+     unreferenced hashed asset (assets/lang-<hash>.json) on the CDN. */
   var langUrls = import.meta.env.DEV
-    ? [new URL('../lang.json', import.meta.url).href, 'i18n/de.json']
+    ? [new URL(/* @vite-ignore */ '../lang.json', import.meta.url).href, 'i18n/de.json']
     : __LANG_URLS__;
   i18n.load(langUrls)
     .catch(function () { /* proceed with raw keys rather than a dead page */ })
